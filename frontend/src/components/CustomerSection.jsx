@@ -6,6 +6,7 @@ const EMPTY_FORM = { name: '', email: '', phone: '', address: '' };
 export default function CustomerSection() {
   const [customers, setCustomers] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -29,8 +30,13 @@ export default function CustomerSection() {
     setError('');
     setLoading(true);
     try {
-      await CustomerApi.create(form);
+      if (editingId) {
+        await CustomerApi.update(editingId, form);
+      } else {
+        await CustomerApi.create(form);
+      }
       setForm(EMPTY_FORM);
+      setEditingId(null);
       await load();
     } catch (err) {
       setError(err.message);
@@ -39,10 +45,26 @@ export default function CustomerSection() {
     }
   };
 
+  const handleEdit = (customer) => {
+    setEditingId(customer.id);
+    setForm({
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      address: customer.address,
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+  };
+
   const handleDelete = async (id) => {
     setError('');
     try {
       await CustomerApi.remove(id);
+      if (editingId === id) handleCancelEdit();
       await load();
     } catch (err) {
       setError(err.message);
@@ -72,9 +94,16 @@ export default function CustomerSection() {
           <label>Address</label>
           <input value={form.address} onChange={handleChange('address')} required />
         </div>
-        <button type="submit" className="primary" disabled={loading}>
-          {loading ? 'Adding...' : 'Add Customer'}
-        </button>
+        <div className="row-actions">
+          <button type="submit" className="primary" disabled={loading}>
+            {loading ? 'Saving...' : editingId ? 'Update Customer' : 'Add Customer'}
+          </button>
+          {editingId && (
+            <button type="button" onClick={handleCancelEdit}>
+              Cancel
+            </button>
+          )}
+        </div>
       </form>
 
       {customers.length === 0 ? (
@@ -100,7 +129,10 @@ export default function CustomerSection() {
                 <td>{c.phone}</td>
                 <td>{c.address}</td>
                 <td>
-                  <button onClick={() => handleDelete(c.id)}>Delete</button>
+                  <div className="row-actions">
+                    <button onClick={() => handleEdit(c)}>Edit</button>
+                    <button onClick={() => handleDelete(c.id)}>Delete</button>
+                  </div>
                 </td>
               </tr>
             ))}

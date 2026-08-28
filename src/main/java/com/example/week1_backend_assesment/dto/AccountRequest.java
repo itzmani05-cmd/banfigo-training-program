@@ -1,6 +1,6 @@
 package com.example.week1_backend_assesment.dto;
 
-import jarkata.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 
 public class AccountRequest {

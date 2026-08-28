@@ -5,6 +5,7 @@ import com.example.week1_backend_assesment.dto.CustomerResponse;
 import com.example.week1_backend_assesment.entity.Customer;
 import com.example.week1_backend_assesment.repository.CustomerRepository;
 import java.util.List;
+import java.util.stream.Collectors;
 import com.example.week1_backend_assesment.exception.ResourceNotFoundException;
 @Service
 public class CustomerService {
@@ -12,32 +13,32 @@ public class CustomerService {
     public CustomerService(CustomerRepository customerRespository){
         this.customerRespository = customerRespository;
     }
-    public Customer createCustomer(CustomerRequest request){
+    public CustomerResponse createCustomer(CustomerRequest request){
         Customer customer=new Customer();
         customer.setName(request.getName());
         customer.setEmail(request.getEmail());
         customer.setPhone(request.getPhone());
         customer.setAddress(request.getAddress());
-        // return customerRespository.save(customer);
         Customer savedCustomer=customerRespository.save(customer);
         return mapToResponse(savedCustomer);
     }
-    public List<Customer> getAllCustomers(){
-        return customerRespository.findAll();
+    public List<CustomerResponse> getAllCustomers(){
+        return customerRespository.findAll().stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
     }
-    public Customer getCustomerById(Long id){
-        // return customerRespository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + id));
+    public CustomerResponse getCustomerById(Long id){
         Customer customer =customerRespository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + id));
         return mapToResponse(customer);
     }
-    public Customer updateCustomer(Long id, CustomerRequest request){
+    public CustomerResponse updateCustomer(Long id, CustomerRequest request){
         Customer customer=customerRespository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + id));
         customer.setName(request.getName());
         customer.setEmail(request.getEmail());
         customer.setPhone(request.getPhone());
         customer.setAddress(request.getAddress());
         Customer updatedcustomer= customerRespository.save(customer);
-        return mapToRespose(updateCustomer);
+        return mapToResponse(updatedcustomer);
     }
     public boolean deleteCustomer(Long id){
         Customer customer=customerRespository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + id));
@@ -48,6 +49,6 @@ public class CustomerService {
     private CustomerResponse mapToResponse(Customer customer){
         return new CustomerResponse(
             customer.getId(), customer.getName(), customer.getEmail(), customer.getPhone(), customer.getAddress()
-        )
+        );
     }
 }

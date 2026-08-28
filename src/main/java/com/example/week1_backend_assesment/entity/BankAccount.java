@@ -1,9 +1,7 @@
 package com.example.week1_backend_assesment.entity;
-import jarkata.persistence.*;
+import jakarta.persistence.*;
 import java.math.BigDecimal;
 
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 @Entity
 @Table(name="bank_accounts")
 public class BankAccount {

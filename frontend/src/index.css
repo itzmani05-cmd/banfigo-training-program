@@ -1,0 +1,87 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+  color: #000000;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+#root {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+
+button {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 16px;
+  background: #ffffff;
+  color: #000000;
+  border: 2px solid #000000;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #000000;
+  color: #ffffff;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button.active,
+button.primary {
+  background: #000000;
+  color: #ffffff;
+}
+
+button.active:hover,
+button.primary:hover {
+  background: #ffffff;
+  color: #000000;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px;
+  border: 1px solid #000000;
+  background: #ffffff;
+  color: #000000;
+  width: 100%;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid #000000;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+th, td {
+  border: 1px solid #000000;
+  padding: 8px;
+  text-align: left;
+  font-size: 14px;
+}
+
+th {
+  background: #000000;
+  color: #ffffff;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #000000;
+  margin: 24px 0;
+}

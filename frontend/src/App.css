@@ -1,0 +1,51 @@
+.app-header {
+  border-bottom: 2px solid #000000;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+.app-header h1 {
+  margin: 0 0 16px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
+  margin-bottom: 16px;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: bold;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.message {
+  border: 1px solid #000000;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+}
+
+.empty {
+  padding: 12px 0;
+  font-style: italic;
+}

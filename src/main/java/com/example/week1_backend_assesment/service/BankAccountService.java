@@ -1,9 +1,13 @@
 package com.example.week1_backend_assesment.service;
 
-import com.example.week1_backend_assesment.*;
+import com.example.week1_backend_assesment.dto.AccountRequest;
+import com.example.week1_backend_assesment.entity.BankAccount;
+import com.example.week1_backend_assesment.entity.Customer;
+import com.example.week1_backend_assesment.exception.ResourceNotFoundException;
+import com.example.week1_backend_assesment.repository.BankAccountRepository;
+import com.example.week1_backend_assesment.repository.CustomerRepository;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -14,7 +18,7 @@ public class BankAccountService {
         this.bankAccountRepository = bankAccountRepository;
         this.customerRepository = customerRepository;
     }
-    public BankAccount createBankAccount(BankAccountRequest request) {
+    public BankAccount createBankAccount(AccountRequest request) {
         if(bankAccountRepository.existsByAccountNumber(request.getAccountNumber())) {
             throw new IllegalArgumentException("Account number already exists: " + request.getAccountNumber());
         }
@@ -22,7 +26,8 @@ public class BankAccountService {
         Customer customer = customerRepository.findById(request.getCustomerId()).orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + request.getCustomerId()));
         BankAccount bankAccount = new BankAccount();
         bankAccount.setAccountNumber(request.getAccountNumber());
-        bankAccount.setBalance(request.getBalance());
+        bankAccount.setAccountType(request.getAccountType());
+        bankAccount.setBalance(java.math.BigDecimal.ZERO);
         bankAccount.setCustomer(customer);
         return bankAccountRepository.save(bankAccount);
     }

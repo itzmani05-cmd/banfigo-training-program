@@ -28,6 +28,12 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.GET,
+                                "/health",
+                                "/api/info"
+                        ).permitAll()
+
                         // Bank accounts
                         .requestMatchers(
                                 org.springframework.http.HttpMethod.GET,

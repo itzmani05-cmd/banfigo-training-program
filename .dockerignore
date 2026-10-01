@@ -1,0 +1,9 @@
+target
+frontend
+.git
+.github
+.qodo
+.idea
+.vscode
+*.pdf
+HELP.md

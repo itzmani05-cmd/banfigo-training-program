@@ -71,7 +71,28 @@ npm run dev
 
 Runs on `http://localhost:5173` by default. API calls to `/api/*` are proxied to the backend (see `frontend/vite.config.js` — update the `target` there if you change the backend port).
 
+### 4. Run Backend with Docker (optional)
+
+```bash
+docker build -t banking-api .
+docker run -p 8082:8082 \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/student_db \
+  -e SPRING_DATASOURCE_USERNAME=postgres \
+  -e SPRING_DATASOURCE_PASSWORD=postgres \
+  banking-api
+```
+
+Inside a container `localhost` refers to the container itself, so the datasource URL points to `host.docker.internal` to reach PostgreSQL running on your machine.
+
 ## API Endpoints
+
+### Health & Info
+| Method | Path | Description |
+|---|---|---|
+| GET | `/health` | Application and database status (`503` if the database is unreachable) |
+| GET | `/api/info` | Application name, description, version, and Java version |
+
+Both endpoints are public (no token required).
 
 ### Customers — `/api/customers`
 | Method | Path | Description |

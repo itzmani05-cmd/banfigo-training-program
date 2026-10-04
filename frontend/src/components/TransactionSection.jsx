@@ -18,7 +18,8 @@ export default function TransactionSection() {
     }
     setError('');
     try {
-      setTransactions(await TransactionApi.listByAccount(accountId));
+      const page = await TransactionApi.listByAccount(accountId, { size: 50 });
+      setTransactions(page.content);
       setLoaded(true);
     } catch (err) {
       setError(err.message);

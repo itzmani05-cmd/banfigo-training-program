@@ -1,14 +1,22 @@
 package com.example.week1_backend_assesment.controller;
 
+import com.example.week1_backend_assesment.dto.PageResponse;
 import com.example.week1_backend_assesment.dto.TransactionRequest;
+import com.example.week1_backend_assesment.dto.TransactionResponse;
 import com.example.week1_backend_assesment.entity.Transaction;
+import com.example.week1_backend_assesment.entity.TransactionType;
 import com.example.week1_backend_assesment.service.TransactionService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/accounts/{accountId}/transactions")
@@ -32,12 +40,17 @@ public class TransactionController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Transaction>> getTransactions(
-            @PathVariable Long accountId) {
+    public ResponseEntity<PageResponse<TransactionResponse>> getTransactions(
+            @PathVariable Long accountId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) TransactionType type,
+            @PageableDefault(size = 10, sort = "transactionDate", direction = Sort.Direction.DESC)
+            Pageable pageable) {
 
-        List<Transaction> transactions =
-                transactionService.getTransactionsByAccountId(accountId);
+        Page<TransactionResponse> transactions =
+                transactionService.getTransactions(accountId, from, to, type, pageable);
 
-        return ResponseEntity.ok(transactions);
+        return ResponseEntity.ok(PageResponse.from(transactions));
     }
 }

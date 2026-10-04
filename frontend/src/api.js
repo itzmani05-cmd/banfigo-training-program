@@ -36,6 +36,12 @@ export const BeneficiaryApi = {
 };
 
 export const TransactionApi = {
-  listByAccount: (accountId) => request(`/accounts/${accountId}/transactions`),
+  // params: { page, size, from, to, type } — empty values are skipped. Returns a page object.
+  listByAccount: (accountId, params = {}) => {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    ).toString();
+    return request(`/accounts/${accountId}/transactions${query ? `?${query}` : ''}`);
+  },
   create: (accountId, data) => request(`/accounts/${accountId}/transactions`, { method: 'POST', body: JSON.stringify(data) }),
 };

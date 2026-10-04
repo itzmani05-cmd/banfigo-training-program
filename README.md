@@ -69,7 +69,7 @@ npm install
 npm run dev
 ```
 
-Runs on `http://localhost:5173` by default. API calls to `/api/*` are proxied to the backend (see `frontend/vite.config.js` — update the `target` there if you change the backend port).
+Runs on `http://localhost:5173` by default. API calls to `/api/*` are proxied to the backend. The backend address is set by `BACKEND_URL` in `frontend/.env` (see `frontend/README.md`).
 
 ### 4. Run Backend with Docker (optional)
 

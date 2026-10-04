@@ -1,4 +1,4 @@
-const BASE_URL = '/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 async function request(path, options = {}) {
   const response = await fetch(`${BASE_URL}${path}`, {
@@ -25,6 +25,7 @@ export const CustomerApi = {
 
 export const AccountApi = {
   list: () => request('/accounts'),
+  get: (id) => request(`/accounts/${id}`),
   create: (data) => request('/accounts', { method: 'POST', body: JSON.stringify(data) }),
 };
 

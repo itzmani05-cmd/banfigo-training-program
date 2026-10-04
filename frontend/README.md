@@ -1,16 +1,79 @@
-# React + Vite
+# Banking Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite frontend for the Mini Banking API. It lets you manage customers, bank accounts, transactions, and beneficiaries through the Spring Boot backend.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19
+- Vite
+- Plain `fetch` for API calls (no UI framework)
+- Oxlint for linting
 
-## React Compiler
+## Prerequisites
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Node.js 18+
+- Backend running (see the root `README.md`), by default on `http://localhost:8082`
 
-## Expanding the Oxlint configuration
+## Setup
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The app runs on `http://localhost:5173`.
+
+## Environment Configuration
+
+Settings live in `frontend/.env`:
+
+| Variable | Default | Used by | Description |
+|---|---|---|---|
+| `VITE_API_BASE_URL` | `/api` | Browser (`src/api.js`) | Base URL for all API calls |
+| `BACKEND_URL` | `http://localhost:8082` | Vite dev server (`vite.config.js`) | Where `/api` requests are proxied in development |
+
+To override values on your machine without changing the shared file, create `frontend/.env.local` (git-ignored):
+
+```properties
+BACKEND_URL=http://localhost:9090
+```
+
+Only variables prefixed with `VITE_` are included in the browser bundle, so `BACKEND_URL` stays on the dev server. Restart `npm run dev` after changing any `.env` file.
+
+## Pages
+
+| Tab | Features |
+|---|---|
+| Customers | List, create, edit, and delete customers |
+| Accounts | List and create accounts; **View** opens account details (customer info + transaction history) |
+| Transactions | Load an account's transaction history; create deposits and withdrawals |
+| Beneficiaries | List, add, and delete beneficiaries |
+
+## Error Handling
+
+All API calls go through `request()` in `src/api.js`. When the backend returns an error, the message from the backend's JSON error body (`message` or validation `details`) is shown at the top of the page. If there is no body, the HTTP status code is shown.
+
+## Project Structure
+
+```
+src/
+├── components/
+│   ├── CustomerSection.jsx
+│   ├── AccountSection.jsx
+│   ├── AccountDetails.jsx
+│   ├── TransactionSection.jsx
+│   └── BeneficiarySection.jsx
+├── api.js        fetch wrappers for the backend API
+├── App.jsx       tab navigation
+└── main.jsx      entry point
+```
+
+## Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start the dev server |
+| `npm run build` | Build for production into `dist/` |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | Run Oxlint |

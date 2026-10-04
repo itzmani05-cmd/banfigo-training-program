@@ -17,7 +17,10 @@ public class HealthController {
     private final DataSource dataSource;
     private final String applicationName;
 
-    public HealthController(DataSource dataSource, @Value("${spring.application.name}") String applicationName) {
+    public HealthController(
+        DataSource dataSource, 
+        @Value("${spring.application.name}") String applicationName
+    ) {
         this.dataSource = dataSource;
         this.applicationName = applicationName;
     }

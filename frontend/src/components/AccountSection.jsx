@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AccountApi } from '../api';
+import AccountDetails from './AccountDetails';
 
 const EMPTY_FORM = { accountNumber: '', accountType: '', customerId: '' };
 
@@ -8,6 +9,7 @@ export default function AccountSection() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
 
   const load = async () => {
     setError('');
@@ -38,6 +40,15 @@ export default function AccountSection() {
       setLoading(false);
     }
   };
+
+  const handleBack = async () => {
+    setSelectedId(null);
+    await load();
+  };
+
+  if (selectedId) {
+    return <AccountDetails accountId={selectedId} onBack={handleBack} />;
+  }
 
   return (
     <div>
@@ -74,6 +85,7 @@ export default function AccountSection() {
               <th>Type</th>
               <th>Balance</th>
               <th>Customer ID</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -84,6 +96,9 @@ export default function AccountSection() {
                 <td>{a.accountType}</td>
                 <td>{a.balance}</td>
                 <td>{a.customer?.id}</td>
+                <td>
+                  <button onClick={() => setSelectedId(a.id)}>View</button>
+                </td>
               </tr>
             ))}
           </tbody>

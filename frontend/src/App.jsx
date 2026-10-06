@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './App.css';
+import Dashboard from './components/Dashboard';
 import CustomerSection from './components/CustomerSection';
 import AccountSection from './components/AccountSection';
 import BeneficiarySection from './components/BeneficiarySection';
@@ -8,6 +9,7 @@ import TransferSection from './components/TransferSection';
 import { getUser, logout } from './auth';
 
 const TABS = [
+  { key: 'dashboard', label: 'Dashboard', component: Dashboard },
   { key: 'customers', label: 'Customers', component: CustomerSection },
   { key: 'accounts', label: 'Accounts', component: AccountSection },
   { key: 'transactions', label: 'Transactions', component: TransactionSection },

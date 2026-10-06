@@ -2,7 +2,8 @@ import { getToken } from './auth';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-async function request(path, options = {}) {
+// Sends an authenticated request and throws a readable Error on failure. Returns the raw Response.
+async function send(path, options = {}) {
   const token = await getToken();
   const response = await fetch(`${BASE_URL}${path}`, {
     ...options,
@@ -21,8 +22,35 @@ async function request(path, options = {}) {
     throw new Error(message);
   }
 
+  return response;
+}
+
+async function request(path, options = {}) {
+  const response = await send(path, options);
   if (response.status === 204) return null;
   return response.json();
+}
+
+// Fetches a file and makes the browser save it (a plain link can't carry the Bearer token)
+async function download(path) {
+  const response = await send(path);
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const fileName = disposition.match(/filename="?([^";]+)"?/)?.[1] || 'download';
+
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  // Revoking in the same tick can cancel the download in some browsers
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function toQuery(params) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+  ).toString();
+  return query ? `?${query}` : '';
 }
 
 export const CustomerApi = {
@@ -44,17 +72,21 @@ export const BeneficiaryApi = {
   remove: (id) => request(`/beneficiaries/${id}`, { method: 'DELETE' }),
 };
 
+// params: { from, to, format: 'csv' | 'pdf' }
+export const StatementApi = {
+  download: (accountId, params) => download(`/accounts/${accountId}/statement${toQuery(params)}`),
+};
+
+export const DashboardApi = {
+  get: () => request('/dashboard'),
+};
+
 export const TransferApi = {
   create: (data) => request('/transfers', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 export const TransactionApi = {
   // params: { page, size, from, to, type } — empty values are skipped. Returns a page object.
-  listByAccount: (accountId, params = {}) => {
-    const query = new URLSearchParams(
-      Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
-    ).toString();
-    return request(`/accounts/${accountId}/transactions${query ? `?${query}` : ''}`);
-  },
+  listByAccount: (accountId, params = {}) => request(`/accounts/${accountId}/transactions${toQuery(params)}`),
   create: (accountId, data) => request(`/accounts/${accountId}/transactions`, { method: 'POST', body: JSON.stringify(data) }),
 };

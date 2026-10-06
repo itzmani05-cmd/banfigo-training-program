@@ -12,8 +12,10 @@ public class TransferRequest {
     @NotNull(message = "Source account ID is required")
     private Long fromAccountId;
 
-    @NotNull(message = "Destination account ID is required")
+    // Exactly one of toAccountId / beneficiaryId must be given (checked in TransferService)
     private Long toAccountId;
+
+    private Long beneficiaryId;
 
     @NotNull(message = "Amount is required")
     @DecimalMin(value = "0.01", message = "Amount must be greater than 0")
@@ -41,6 +43,14 @@ public class TransferRequest {
 
     public void setToAccountId(Long toAccountId) {
         this.toAccountId = toAccountId;
+    }
+
+    public Long getBeneficiaryId() {
+        return beneficiaryId;
+    }
+
+    public void setBeneficiaryId(Long beneficiaryId) {
+        this.beneficiaryId = beneficiaryId;
     }
 
     public BigDecimal getAmount() {

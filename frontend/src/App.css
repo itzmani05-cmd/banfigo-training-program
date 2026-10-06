@@ -63,3 +63,115 @@
   padding: 12px 0;
   font-style: italic;
 }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 16px 0 24px;
+}
+
+.stat-tile {
+  border: 2px solid #000000;
+  padding: 12px 16px;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #52514e;
+}
+
+.stat-value {
+  font-size: 26px;
+  font-weight: bold;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chart colors and chrome; series pair validated for color-blind separation on white */
+.viz-root {
+  --series-in: #2a78d6;
+  --series-out: #eb6834;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --muted: #6b6a65;
+  margin-bottom: 24px;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.chart-wrap {
+  position: relative;
+}
+
+.chart-wrap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.axis-label {
+  font-size: 12px;
+  fill: var(--muted);
+}
+
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-style: italic;
+  pointer-events: none;
+}
+
+.chart-tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  background: #ffffff;
+  border: 1px solid #000000;
+  padding: 8px 10px;
+  font-size: 13px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tooltip-value {
+  margin-left: auto;
+  padding-left: 12px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+details summary {
+  cursor: pointer;
+  font-size: 13px;
+  margin-top: 8px;
+}

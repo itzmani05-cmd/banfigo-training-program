@@ -119,11 +119,25 @@ Both endpoints are public (no token required).
 ### Transfers — `/api/transfers`
 | Method | Path | Description |
 |---|---|---|
-| POST | `/` | Move money between two accounts (requires `MAKER` role) |
+| POST | `/` | Move money to another account or a saved beneficiary (requires `MAKER` role) |
 
-Request body: `{ "fromAccountId": 1, "toAccountId": 2, "amount": 250.00, "description": "Rent" }`
+Request body: `{ "fromAccountId": 1, "toAccountId": 2, "amount": 250.00, "description": "Rent" }`, or with `"beneficiaryId": 5` instead of `toAccountId`.
+
+Paying a beneficiary: the source account must belong to the customer who saved the beneficiary. If the beneficiary's account number is an account in this bank, it is credited like a normal transfer; otherwise only the debit is recorded (an outgoing payment to another bank).
 
 A transfer is all-or-nothing: it writes a `WITHDRAWAL` on the source account and a `DEPOSIT` on the destination, both with the same `reference`, in one database transaction. Both account rows are locked (lowest id first) so concurrent transfers can't overdraw an account or deadlock.
+
+### Statements — `/api/accounts/{accountId}/statement`
+| Method | Path | Description |
+|---|---|---|
+| GET | `/?from=2026-10-01&to=2026-10-31&format=pdf` | Download a statement as `pdf` or `csv` (default) |
+
+Includes the opening balance, every transaction with a running balance, total debits/credits, and the closing balance. The period can be at most one year.
+
+### Dashboard — `/api/dashboard`
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | Total balance, account and customer counts, 10 most recent transactions, and money in/out for the last 6 months |
 
 ### Beneficiaries — `/api/beneficiaries`
 | Method | Path | Description |

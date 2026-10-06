@@ -3,10 +3,13 @@ package com.example.week1_backend_assesment.service;
 import com.example.week1_backend_assesment.dto.TransferRequest;
 import com.example.week1_backend_assesment.dto.TransferResponse;
 import com.example.week1_backend_assesment.entity.BankAccount;
+import com.example.week1_backend_assesment.entity.Beneficiary;
+import com.example.week1_backend_assesment.entity.Customer;
 import com.example.week1_backend_assesment.entity.Transaction;
 import com.example.week1_backend_assesment.entity.TransactionType;
 import com.example.week1_backend_assesment.exception.ResourceNotFoundException;
 import com.example.week1_backend_assesment.repository.BankAccountRepository;
+import com.example.week1_backend_assesment.repository.BeneficiaryRepository;
 import com.example.week1_backend_assesment.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,8 +28,11 @@ class TransferServiceTest {
 
     private BankAccountRepository accountRepository;
     private TransactionRepository transactionRepository;
+    private BeneficiaryRepository beneficiaryRepository;
     private TransferService transferService;
 
+    private Customer alice;
+    private Customer bob;
     private BankAccount accountA;
     private BankAccount accountB;
 
@@ -34,10 +40,13 @@ class TransferServiceTest {
     void setUp() {
         accountRepository = mock(BankAccountRepository.class);
         transactionRepository = mock(TransactionRepository.class);
-        transferService = new TransferService(accountRepository, transactionRepository);
+        beneficiaryRepository = mock(BeneficiaryRepository.class);
+        transferService = new TransferService(accountRepository, transactionRepository, beneficiaryRepository);
 
-        accountA = new BankAccount(1L, "1111111111", "SAVINGS", new BigDecimal("500.00"), null);
-        accountB = new BankAccount(2L, "2222222222", "SAVINGS", new BigDecimal("100.00"), null);
+        alice = new Customer(10L, "Alice", "alice@example.com", null, null);
+        bob = new Customer(20L, "Bob", "bob@example.com", null, null);
+        accountA = new BankAccount(1L, "1111111111", "SAVINGS", new BigDecimal("500.00"), alice);
+        accountB = new BankAccount(2L, "2222222222", "SAVINGS", new BigDecimal("100.00"), bob);
 
         when(accountRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(accountA));
         when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(accountB));
@@ -50,6 +59,18 @@ class TransferServiceTest {
         request.setAmount(new BigDecimal(amount));
         request.setDescription(description);
         return request;
+    }
+
+    private static TransferRequest beneficiaryRequest(Long from, Long beneficiaryId, String amount) {
+        TransferRequest request = request(from, null, amount, null);
+        request.setBeneficiaryId(beneficiaryId);
+        return request;
+    }
+
+    private Beneficiary beneficiary(Long id, String accountNumber, Customer owner) {
+        Beneficiary beneficiary = new Beneficiary(id, "Carol", accountNumber, "Other Bank", "OTHB0001234", owner);
+        when(beneficiaryRepository.findById(id)).thenReturn(Optional.of(beneficiary));
+        return beneficiary;
     }
 
     @Test
@@ -117,5 +138,68 @@ class TransferServiceTest {
                 () -> transferService.transfer(request(1L, 99L, "10", null)));
 
         verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsBothOrNeitherDestination() {
+        TransferRequest both = request(1L, 2L, "10", null);
+        both.setBeneficiaryId(5L);
+
+        assertThrows(IllegalArgumentException.class, () -> transferService.transfer(both));
+        assertThrows(IllegalArgumentException.class,
+                () -> transferService.transfer(request(1L, null, "10", null)));
+    }
+
+    @Test
+    void paysExternalBeneficiaryByDebitingOnlyTheSource() {
+        beneficiary(5L, "9999999999123", alice);
+        when(accountRepository.findIdByAccountNumber("9999999999123")).thenReturn(Optional.empty());
+
+        TransferResponse response = transferService.transfer(beneficiaryRequest(1L, 5L, "75"));
+
+        assertEquals(new BigDecimal("425.00"), accountA.getBalance());
+        assertNull(response.getToAccountId());
+        assertEquals("Carol", response.getBeneficiaryName());
+
+        ArgumentCaptor<Transaction> captor = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository, times(1)).save(captor.capture());
+        Transaction debit = captor.getValue();
+        assertEquals(TransactionType.WITHDRAWAL, debit.getTransactionType());
+        assertEquals("Transfer to Carol (Other Bank, A/C 9999999999123)", debit.getDescription());
+    }
+
+    @Test
+    void paysInternalBeneficiaryByCreditingTheirAccount() {
+        beneficiary(5L, "2222222222", alice);
+        when(accountRepository.findIdByAccountNumber("2222222222")).thenReturn(Optional.of(2L));
+
+        TransferResponse response = transferService.transfer(beneficiaryRequest(1L, 5L, "75"));
+
+        assertEquals(new BigDecimal("425.00"), accountA.getBalance());
+        assertEquals(new BigDecimal("175.00"), accountB.getBalance());
+        assertEquals(2L, response.getToAccountId());
+        assertEquals(5L, response.getBeneficiaryId());
+        verify(transactionRepository, times(2)).save(any());
+    }
+
+    @Test
+    void rejectsBeneficiaryOfAnotherCustomer() {
+        beneficiary(5L, "9999999999123", bob);
+        when(accountRepository.findIdByAccountNumber("9999999999123")).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> transferService.transfer(beneficiaryRequest(1L, 5L, "75")));
+
+        assertEquals("Beneficiary does not belong to the owner of the source account", ex.getMessage());
+        assertEquals(new BigDecimal("500.00"), accountA.getBalance());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsUnknownBeneficiary() {
+        when(beneficiaryRepository.findById(404L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> transferService.transfer(beneficiaryRequest(1L, 404L, "10")));
     }
 }

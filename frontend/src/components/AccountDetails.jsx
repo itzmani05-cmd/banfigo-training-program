@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react';
-import { AccountApi, TransactionApi } from '../api';
+import { AccountApi, StatementApi, TransactionApi } from '../api';
 
 const PAGE_SIZE = 10;
 const EMPTY_FILTERS = { from: '', to: '', type: '' };
+
+// yyyy-MM-dd in local time (toISOString would use UTC and can be off by a day)
+const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const defaultStatementRange = () => {
+  const today = new Date();
+  return { from: isoDate(new Date(today.getFullYear(), today.getMonth(), 1)), to: isoDate(today) };
+};
 
 export default function AccountDetails({ accountId, onBack }) {
   const [account, setAccount] = useState(null);
@@ -14,6 +22,8 @@ export default function AccountDetails({ accountId, onBack }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [txLoading, setTxLoading] = useState(false);
+  const [statementRange, setStatementRange] = useState(defaultStatementRange);
+  const [downloading, setDownloading] = useState('');
 
   useEffect(() => {
     const loadAccount = async () => {
@@ -56,6 +66,20 @@ export default function AccountDetails({ accountId, onBack }) {
     e.preventDefault();
     setFilters(draftFilters);
     setPage(0);
+  };
+
+  const handleStatementChange = (field) => (e) => setStatementRange({ ...statementRange, [field]: e.target.value });
+
+  const downloadStatement = async (format) => {
+    setError('');
+    setDownloading(format);
+    try {
+      await StatementApi.download(accountId, { ...statementRange, format });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDownloading('');
+    }
   };
 
   const clearFilters = () => {
@@ -109,6 +133,36 @@ export default function AccountDetails({ accountId, onBack }) {
               </tr>
             </tbody>
           </table>
+
+          <hr />
+
+          <h3>Download Statement</h3>
+
+          <div className="form-grid">
+            <div className="field">
+              <label>From</label>
+              <input type="date" value={statementRange.from} onChange={handleStatementChange('from')} />
+            </div>
+            <div className="field">
+              <label>To</label>
+              <input type="date" value={statementRange.to} onChange={handleStatementChange('to')} />
+            </div>
+            <div className="row-actions">
+              <button
+                className="primary"
+                onClick={() => downloadStatement('pdf')}
+                disabled={!statementRange.from || !statementRange.to || downloading !== ''}
+              >
+                {downloading === 'pdf' ? 'Preparing...' : 'Download PDF'}
+              </button>
+              <button
+                onClick={() => downloadStatement('csv')}
+                disabled={!statementRange.from || !statementRange.to || downloading !== ''}
+              >
+                {downloading === 'csv' ? 'Preparing...' : 'Download CSV'}
+              </button>
+            </div>
+          </div>
 
           <hr />
 

@@ -62,10 +62,11 @@ Users need realm roles for anything beyond viewing: `ADMIN` (create accounts, cr
 
 | Tab | Features |
 |---|---|
+| Dashboard | Total balance, account/customer counts, money in vs out chart (last 6 months), recent transactions |
 | Customers | List, create, edit, and delete customers |
-| Accounts | List and create accounts; **View** opens account details (customer info + transaction history) |
+| Accounts | List and create accounts; **View** opens account details (customer info, statement download as PDF/CSV, transaction history) |
 | Transactions | Load an account's transaction history; create deposits and withdrawals |
-| Transfers | Move money between two accounts; shows the transfer reference and the source balance afterwards |
+| Transfers | Move money to another account or pay a saved beneficiary; shows the transfer reference and the source balance afterwards |
 | Beneficiaries | List, add, and delete beneficiaries |
 
 ## Error Handling
@@ -82,6 +83,8 @@ src/
 │   ├── AccountDetails.jsx
 │   ├── TransactionSection.jsx
 │   ├── TransferSection.jsx
+│   ├── Dashboard.jsx
+│   ├── MonthlyFlowChart.jsx
 │   └── BeneficiarySection.jsx
 ├── api.js        fetch wrappers for the backend API
 ├── App.jsx       tab navigation

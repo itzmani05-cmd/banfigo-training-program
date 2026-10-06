@@ -3,30 +3,39 @@ package com.example.week1_backend_assesment.service;
 import com.example.week1_backend_assesment.dto.TransferRequest;
 import com.example.week1_backend_assesment.dto.TransferResponse;
 import com.example.week1_backend_assesment.entity.BankAccount;
+import com.example.week1_backend_assesment.entity.Beneficiary;
 import com.example.week1_backend_assesment.entity.Transaction;
 import com.example.week1_backend_assesment.entity.TransactionType;
 import com.example.week1_backend_assesment.exception.ResourceNotFoundException;
 import com.example.week1_backend_assesment.repository.BankAccountRepository;
+import com.example.week1_backend_assesment.repository.BeneficiaryRepository;
 import com.example.week1_backend_assesment.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class TransferService {
 
+    // Size of the transactions.description column
+    private static final int MAX_DESCRIPTION_LENGTH = 255;
+
     private final BankAccountRepository bankAccountRepository;
     private final TransactionRepository transactionRepository;
+    private final BeneficiaryRepository beneficiaryRepository;
 
     public TransferService(
             BankAccountRepository bankAccountRepository,
-            TransactionRepository transactionRepository) {
+            TransactionRepository transactionRepository,
+            BeneficiaryRepository beneficiaryRepository) {
 
         this.bankAccountRepository = bankAccountRepository;
         this.transactionRepository = transactionRepository;
+        this.beneficiaryRepository = beneficiaryRepository;
     }
 
     // Debit and credit happen in one database transaction: if anything fails,
@@ -34,8 +43,61 @@ public class TransferService {
     @Transactional
     public TransferResponse transfer(TransferRequest request) {
 
+        boolean toAccount = request.getToAccountId() != null;
+        boolean toBeneficiary = request.getBeneficiaryId() != null;
+
+        if (toAccount == toBeneficiary) {
+            throw new IllegalArgumentException(
+                    "Provide either toAccountId or beneficiaryId, not both"
+            );
+        }
+
+        return toAccount
+                ? transferBetweenAccounts(request, request.getToAccountId(), null)
+                : transferToBeneficiary(request);
+    }
+
+    private TransferResponse transferToBeneficiary(TransferRequest request) {
+
+        Beneficiary beneficiary = beneficiaryRepository.findById(request.getBeneficiaryId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Beneficiary not found with id: " + request.getBeneficiaryId()));
+
+        // Beneficiary banks with us: move the money between the two accounts
+        Optional<Long> internalAccountId =
+                bankAccountRepository.findIdByAccountNumber(beneficiary.getAccountNumber());
+
+        if (internalAccountId.isPresent()) {
+            return transferBetweenAccounts(request, internalAccountId.get(), beneficiary);
+        }
+
+        // Beneficiary is at another bank: only the debit is recorded here
+        BankAccount from = lockAccount(request.getFromAccountId());
+        checkOwnsBeneficiary(from, beneficiary);
+        debit(from, request.getAmount());
+
+        String reference = UUID.randomUUID().toString();
+        LocalDateTime now = LocalDateTime.now();
+        String note = request.getDescription();
+
+        transactionRepository.save(newEntry(
+                from, TransactionType.WITHDRAWAL, request.getAmount(),
+                withNote("Transfer to " + beneficiary.getName()
+                        + " (" + beneficiary.getBankName() + ", A/C " + beneficiary.getAccountNumber() + ")", note),
+                reference, now));
+
+        return new TransferResponse(
+                reference, from.getId(), null, beneficiary.getAccountNumber(),
+                beneficiary.getId(), beneficiary.getName(),
+                request.getAmount(), note, now, from.getBalance()
+        );
+    }
+
+    private TransferResponse transferBetweenAccounts(
+            TransferRequest request, Long toId, Beneficiary beneficiary) {
+
         Long fromId = request.getFromAccountId();
-        Long toId = request.getToAccountId();
 
         if (fromId.equals(toId)) {
             throw new IllegalArgumentException(
@@ -50,15 +112,13 @@ public class TransferService {
         BankAccount from = fromId.equals(first.getId()) ? first : second;
         BankAccount to = fromId.equals(first.getId()) ? second : first;
 
-        BigDecimal amount = request.getAmount();
-
-        if (from.getBalance().compareTo(amount) < 0) {
-            throw new IllegalArgumentException("Insufficient balance");
+        if (beneficiary != null) {
+            checkOwnsBeneficiary(from, beneficiary);
         }
 
-        from.setBalance(from.getBalance().subtract(amount));
+        BigDecimal amount = request.getAmount();
+        debit(from, amount);
         to.setBalance(to.getBalance().add(amount));
-        bankAccountRepository.save(from);
         bankAccountRepository.save(to);
 
         String reference = UUID.randomUUID().toString();
@@ -73,7 +133,10 @@ public class TransferService {
                 withNote("Transfer from " + from.getAccountNumber(), note), reference, now));
 
         return new TransferResponse(
-                reference, fromId, toId, amount, note, now, from.getBalance()
+                reference, fromId, toId, to.getAccountNumber(),
+                beneficiary != null ? beneficiary.getId() : null,
+                beneficiary != null ? beneficiary.getName() : null,
+                amount, note, now, from.getBalance()
         );
     }
 
@@ -84,8 +147,26 @@ public class TransferService {
                                 "Bank account not found with id: " + id));
     }
 
+    private void debit(BankAccount account, BigDecimal amount) {
+        if (account.getBalance().compareTo(amount) < 0) {
+            throw new IllegalArgumentException("Insufficient balance");
+        }
+        account.setBalance(account.getBalance().subtract(amount));
+        bankAccountRepository.save(account);
+    }
+
+    // A customer can only pay their own saved beneficiaries
+    private static void checkOwnsBeneficiary(BankAccount from, Beneficiary beneficiary) {
+        if (!beneficiary.getCustomer().getId().equals(from.getCustomer().getId())) {
+            throw new IllegalArgumentException(
+                    "Beneficiary does not belong to the owner of the source account"
+            );
+        }
+    }
+
     private static String withNote(String text, String note) {
-        return (note == null || note.isBlank()) ? text : text + " - " + note;
+        String full = (note == null || note.isBlank()) ? text : text + " - " + note;
+        return full.length() > MAX_DESCRIPTION_LENGTH ? full.substring(0, MAX_DESCRIPTION_LENGTH) : full;
     }
 
     private static Transaction newEntry(BankAccount account, TransactionType type, BigDecimal amount,

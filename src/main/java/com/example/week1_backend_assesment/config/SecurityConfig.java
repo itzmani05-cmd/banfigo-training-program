@@ -66,7 +66,24 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/beneficiaries/**"
                         ).authenticated()
-                        .anyRequest().permitAll()
+
+                        // Customers
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.GET,
+                                "/api/customers",
+                                "/api/customers/**"
+                        ).authenticated()
+
+                        .requestMatchers(
+                                "/api/customers",
+                                "/api/customers/**"
+                        ).hasRole("ADMIN")
+
+                        // Spring's error page, so error responses aren't turned into 401s
+                        .requestMatchers("/error").permitAll()
+
+                        // Anything not listed above needs a logged-in user
+                        .anyRequest().authenticated()
                 )
 
                 .oauth2ResourceServer(oauth2 ->

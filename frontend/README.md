@@ -32,6 +32,9 @@ Settings live in `frontend/.env`:
 |---|---|---|---|
 | `VITE_API_BASE_URL` | `/api` | Browser (`src/api.js`) | Base URL for all API calls |
 | `BACKEND_URL` | `http://localhost:8082` | Vite dev server (`vite.config.js`) | Where `/api` requests are proxied in development |
+| `VITE_KEYCLOAK_URL` | `http://localhost:8086` | Browser (`src/auth.js`) | Keycloak server URL |
+| `VITE_KEYCLOAK_REALM` | `Banfigo` | Browser (`src/auth.js`) | Keycloak realm |
+| `VITE_KEYCLOAK_CLIENT_ID` | `banfigo-frontend` | Browser (`src/auth.js`) | Keycloak client used for login |
 
 To override values on your machine without changing the shared file, create `frontend/.env.local` (git-ignored):
 
@@ -40,6 +43,20 @@ BACKEND_URL=http://localhost:9090
 ```
 
 Only variables prefixed with `VITE_` are included in the browser bundle, so `BACKEND_URL` stays on the dev server. Restart `npm run dev` after changing any `.env` file.
+
+## Authentication (Keycloak)
+
+The app redirects to Keycloak on load and sends the access token as `Authorization: Bearer <token>` with every API call (`src/auth.js`, `src/api.js`). Tokens are refreshed automatically.
+
+Create the client once in the Keycloak admin console (realm `Banfigo`):
+
+1. **Clients → Create client**, Client ID `banfigo-frontend`
+2. **Client authentication**: Off (public client), **Standard flow**: On
+3. **Valid redirect URIs**: `http://localhost:5173/*`
+4. **Valid post logout redirect URIs**: `http://localhost:5173/*`
+5. **Web origins**: `http://localhost:5173`
+
+Users need realm roles for anything beyond viewing: `ADMIN` (create accounts, create/edit/delete customers, delete beneficiaries), `MAKER` (create transactions), `CHECKER` (delete beneficiaries).
 
 ## Pages
 

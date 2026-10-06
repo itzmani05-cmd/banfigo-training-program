@@ -8,6 +8,20 @@
   margin: 0 0 16px;
 }
 
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .tabs {
   display: flex;
   gap: 8px;

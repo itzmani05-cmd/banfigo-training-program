@@ -4,6 +4,7 @@ import CustomerSection from './components/CustomerSection';
 import AccountSection from './components/AccountSection';
 import BeneficiarySection from './components/BeneficiarySection';
 import TransactionSection from './components/TransactionSection';
+import { getUser, logout } from './auth';
 
 const TABS = [
   { key: 'customers', label: 'Customers', component: CustomerSection },
@@ -15,11 +16,18 @@ const TABS = [
 function App() {
   const [activeTab, setActiveTab] = useState(TABS[0].key);
   const ActiveComponent = TABS.find((t) => t.key === activeTab).component;
+  const user = getUser();
 
   return (
     <>
       <header className="app-header">
-        <h1>Banking API Console</h1>
+        <div className="header-top">
+          <h1>Banking API Console</h1>
+          <div className="user-info">
+            <span>{user.username}</span>
+            <button onClick={logout}>Log out</button>
+          </div>
+        </div>
         <div className="tabs">
           {TABS.map((tab) => (
             <button

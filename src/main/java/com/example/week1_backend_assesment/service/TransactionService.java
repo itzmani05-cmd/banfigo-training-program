@@ -40,7 +40,8 @@ public class TransactionService {
             Long accountId,
             TransactionRequest request) {
 
-        BankAccount account = bankAccountRepository.findById(accountId)
+        // Lock the account row so two withdrawals can't both pass the balance check
+        BankAccount account = bankAccountRepository.findByIdForUpdate(accountId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Bank account not found with id: " + accountId));

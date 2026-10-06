@@ -1,10 +1,19 @@
+import { getToken } from './auth';
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 async function request(path, options = {}) {
+  const token = await getToken();
   const response = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
   });
+
+  if (response.status === 401) throw new Error('Your session has expired. Please log in again.');
+  if (response.status === 403) throw new Error('You do not have permission to perform this action.');
 
   if (!response.ok) {
     const body = await response.json().catch(() => null);

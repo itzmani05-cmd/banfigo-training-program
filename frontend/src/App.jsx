@@ -4,12 +4,14 @@ import CustomerSection from './components/CustomerSection';
 import AccountSection from './components/AccountSection';
 import BeneficiarySection from './components/BeneficiarySection';
 import TransactionSection from './components/TransactionSection';
+import TransferSection from './components/TransferSection';
 import { getUser, logout } from './auth';
 
 const TABS = [
   { key: 'customers', label: 'Customers', component: CustomerSection },
   { key: 'accounts', label: 'Accounts', component: AccountSection },
   { key: 'transactions', label: 'Transactions', component: TransactionSection },
+  { key: 'transfers', label: 'Transfers', component: TransferSection },
   { key: 'beneficiaries', label: 'Beneficiaries', component: BeneficiarySection },
 ];
 

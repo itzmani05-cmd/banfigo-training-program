@@ -36,7 +36,7 @@ public class TransactionService {
     }
 
     @Transactional
-    public Transaction createTransaction(
+    public TransactionResponse createTransaction(
             Long accountId,
             TransactionRequest request) {
 
@@ -77,7 +77,7 @@ public class TransactionService {
         transaction.setTransactionDate(LocalDateTime.now());
         transaction.setAccount(account);
 
-        return transactionRepository.save(transaction);
+        return mapToResponse(transactionRepository.save(transaction));
     }
 
     @Transactional(readOnly = true)
@@ -121,13 +121,19 @@ public class TransactionService {
         };
 
         return transactionRepository.findAll(spec, pageable)
-                .map(t -> new TransactionResponse(
-                        t.getId(),
-                        t.getTransactionType(),
-                        t.getAmount(),
-                        t.getDescription(),
-                        t.getTransactionDate(),
-                        accountId
-                ));
+                .map(TransactionService::mapToResponse);
+    }
+
+    static TransactionResponse mapToResponse(Transaction t) {
+        return new TransactionResponse(
+                t.getId(),
+                t.getTransactionType(),
+                t.getAmount(),
+                t.getDescription(),
+                t.getTransactionDate(),
+                // Reading the id of a lazy proxy doesn't trigger a database load
+                t.getAccount().getId(),
+                t.getReference()
+        );
     }
 }

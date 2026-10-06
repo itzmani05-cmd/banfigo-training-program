@@ -65,6 +65,7 @@ Users need realm roles for anything beyond viewing: `ADMIN` (create accounts, cr
 | Customers | List, create, edit, and delete customers |
 | Accounts | List and create accounts; **View** opens account details (customer info + transaction history) |
 | Transactions | Load an account's transaction history; create deposits and withdrawals |
+| Transfers | Move money between two accounts; shows the transfer reference and the source balance afterwards |
 | Beneficiaries | List, add, and delete beneficiaries |
 
 ## Error Handling
@@ -80,6 +81,7 @@ src/
 │   ├── AccountSection.jsx
 │   ├── AccountDetails.jsx
 │   ├── TransactionSection.jsx
+│   ├── TransferSection.jsx
 │   └── BeneficiarySection.jsx
 ├── api.js        fetch wrappers for the backend API
 ├── App.jsx       tab navigation

@@ -44,6 +44,10 @@ export const BeneficiaryApi = {
   remove: (id) => request(`/beneficiaries/${id}`, { method: 'DELETE' }),
 };
 
+export const TransferApi = {
+  create: (data) => request('/transfers', { method: 'POST', body: JSON.stringify(data) }),
+};
+
 export const TransactionApi = {
   // params: { page, size, from, to, type } — empty values are skipped. Returns a page object.
   listByAccount: (accountId, params = {}) => {

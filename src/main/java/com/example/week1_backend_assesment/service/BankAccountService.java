@@ -1,6 +1,7 @@
 package com.example.week1_backend_assesment.service;
 
 import com.example.week1_backend_assesment.dto.AccountRequest;
+import com.example.week1_backend_assesment.dto.AccountResponse;
 import com.example.week1_backend_assesment.entity.BankAccount;
 import com.example.week1_backend_assesment.entity.Customer;
 import com.example.week1_backend_assesment.exception.ResourceNotFoundException;
@@ -18,7 +19,7 @@ public class BankAccountService {
         this.bankAccountRepository = bankAccountRepository;
         this.customerRepository = customerRepository;
     }
-    public BankAccount createBankAccount(AccountRequest request) {
+    public AccountResponse createBankAccount(AccountRequest request) {
         if(bankAccountRepository.existsByAccountNumber(request.getAccountNumber())) {
             throw new IllegalArgumentException("Account number already exists: " + request.getAccountNumber());
         }
@@ -29,12 +30,28 @@ public class BankAccountService {
         bankAccount.setAccountType(request.getAccountType());
         bankAccount.setBalance(java.math.BigDecimal.ZERO);
         bankAccount.setCustomer(customer);
-        return bankAccountRepository.save(bankAccount);
+        return mapToResponse(bankAccountRepository.save(bankAccount));
     }
-    public List<BankAccount> getAllBankAccounts() {
-        return bankAccountRepository.findAll();
+    public List<AccountResponse> getAllBankAccounts() {
+        return bankAccountRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .toList();
     }
-    public BankAccount getBankAccountById(Long id) {
-        return bankAccountRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Bank account not found with id: " + id));
+    public AccountResponse getBankAccountById(Long id) {
+        BankAccount account = bankAccountRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Bank account not found with id: " + id));
+        return mapToResponse(account);
+    }
+
+    private AccountResponse mapToResponse(BankAccount account) {
+        Customer customer = account.getCustomer();
+        return new AccountResponse(
+                account.getId(),
+                account.getAccountNumber(),
+                account.getAccountType(),
+                account.getBalance(),
+                customer.getId(),
+                customer.getName(),
+                customer.getEmail()
+        );
     }
 }

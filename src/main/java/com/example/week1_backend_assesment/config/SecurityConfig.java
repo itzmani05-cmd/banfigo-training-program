@@ -57,6 +57,12 @@ public class SecurityConfig {
                                 "/api/accounts/*/transactions"
                         ).authenticated()
 
+                        // Transfers
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/transfers"
+                        ).hasRole("MAKER")
+
                         // Beneficiaries
                         .requestMatchers(
                                 org.springframework.http.HttpMethod.DELETE,

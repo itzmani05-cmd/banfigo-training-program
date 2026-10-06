@@ -1,7 +1,7 @@
 package com.example.week1_backend_assesment.controller;
 
 import com.example.week1_backend_assesment.dto.BeneficiaryRequest;
-import com.example.week1_backend_assesment.entity.Beneficiary;
+import com.example.week1_backend_assesment.dto.BeneficiaryResponse;
 import com.example.week1_backend_assesment.service.BeneficiaryService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -20,14 +20,14 @@ public class BeneficiaryController {
     }
 
     @PostMapping
-    public ResponseEntity<Beneficiary> createBeneficiary(@Valid @RequestBody BeneficiaryRequest request) {
-        Beneficiary beneficiary =beneficiaryService.createBeneficiary(request);
+    public ResponseEntity<BeneficiaryResponse> createBeneficiary(@Valid @RequestBody BeneficiaryRequest request) {
+        BeneficiaryResponse beneficiary =beneficiaryService.createBeneficiary(request);
         return new ResponseEntity<>(beneficiary,HttpStatus.CREATED);
     }
 
     @GetMapping
-    public ResponseEntity<List<Beneficiary>> getAllBeneficiaries() {
-        List<Beneficiary> beneficiaries =beneficiaryService.getAllBeneficiaries();
+    public ResponseEntity<List<BeneficiaryResponse>> getAllBeneficiaries() {
+        List<BeneficiaryResponse> beneficiaries =beneficiaryService.getAllBeneficiaries();
         return ResponseEntity.ok(beneficiaries);
     }
 

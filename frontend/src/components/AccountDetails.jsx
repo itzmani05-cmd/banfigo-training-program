@@ -98,14 +98,14 @@ export default function AccountDetails({ accountId, onBack }) {
               <tr>
                 <th>Customer</th>
                 <td>
-                  {account.customer
-                    ? `${account.customer.name} (ID ${account.customer.id})`
-                    : '-'}
+                  {account.customerName
+                    ? `${account.customerName} (ID ${account.customerId})`
+                    : `ID ${account.customerId}`}
                 </td>
               </tr>
               <tr>
                 <th>Customer Email</th>
-                <td>{account.customer?.email || '-'}</td>
+                <td>{account.customerEmail || '-'}</td>
               </tr>
             </tbody>
           </table>

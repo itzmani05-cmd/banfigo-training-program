@@ -3,7 +3,6 @@ package com.example.week1_backend_assesment.controller;
 import com.example.week1_backend_assesment.dto.PageResponse;
 import com.example.week1_backend_assesment.dto.TransactionRequest;
 import com.example.week1_backend_assesment.dto.TransactionResponse;
-import com.example.week1_backend_assesment.entity.Transaction;
 import com.example.week1_backend_assesment.entity.TransactionType;
 import com.example.week1_backend_assesment.service.TransactionService;
 import jakarta.validation.Valid;
@@ -29,11 +28,11 @@ public class TransactionController {
     }
 
     @PostMapping
-    public ResponseEntity<Transaction> createTransaction(
+    public ResponseEntity<TransactionResponse> createTransaction(
             @PathVariable Long accountId,
             @Valid @RequestBody TransactionRequest request) {
 
-        Transaction transaction =
+        TransactionResponse transaction =
                 transactionService.createTransaction(accountId, request);
 
         return new ResponseEntity<>(transaction, HttpStatus.CREATED);

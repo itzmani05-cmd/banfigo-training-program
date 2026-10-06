@@ -1,6 +1,7 @@
 package com.example.week1_backend_assesment.service;
 
 import com.example.week1_backend_assesment.dto.BeneficiaryRequest;
+import com.example.week1_backend_assesment.dto.BeneficiaryResponse;
 import com.example.week1_backend_assesment.entity.Beneficiary;
 import com.example.week1_backend_assesment.entity.Customer;
 import com.example.week1_backend_assesment.exception.ResourceNotFoundException;
@@ -23,7 +24,7 @@ public class BeneficiaryService {
         this.customerRepository = customerRepository;
     }
 
-    public Beneficiary createBeneficiary(BeneficiaryRequest request) {
+    public BeneficiaryResponse createBeneficiary(BeneficiaryRequest request) {
         Customer customer = customerRepository.findById(request.getCustomerId()).orElseThrow(() ->new ResourceNotFoundException("Customer not found with id: "+ request.getCustomerId()));
 
         Beneficiary beneficiary = new Beneficiary();
@@ -33,15 +34,29 @@ public class BeneficiaryService {
         beneficiary.setIfscCode(request.getIfscCode());
         beneficiary.setCustomer(customer);
 
-        return beneficiaryRepository.save(beneficiary);
+        return mapToResponse(beneficiaryRepository.save(beneficiary));
     }
 
-    public List<Beneficiary> getAllBeneficiaries() {
-        return beneficiaryRepository.findAll();
+    public List<BeneficiaryResponse> getAllBeneficiaries() {
+        return beneficiaryRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 
     public void deleteBeneficiary(Long id) {
         Beneficiary beneficiary = beneficiaryRepository.findById(id).orElseThrow(() ->new ResourceNotFoundException("Beneficiary not found with id: " + id));
         beneficiaryRepository.delete(beneficiary);
+    }
+
+    private BeneficiaryResponse mapToResponse(Beneficiary beneficiary) {
+        return new BeneficiaryResponse(
+                beneficiary.getId(),
+                beneficiary.getName(),
+                beneficiary.getAccountNumber(),
+                beneficiary.getBankName(),
+                beneficiary.getIfscCode(),
+                // Reading the id of a lazy proxy doesn't trigger a database load
+                beneficiary.getCustomer().getId()
+        );
     }
 }

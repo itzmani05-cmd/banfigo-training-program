@@ -1,6 +1,6 @@
 # Banking API
 
-A simple banking backend (Spring Boot) with a React frontend, built for the Week 1 backend assessment. Supports managing customers, bank accounts, transactions (deposit/withdrawal), and beneficiaries.
+A simple banking backend (Spring Boot) with a React frontend, built for the Week 1 backend assessment. Supports managing customers, bank accounts, transactions (deposit/withdrawal), transfers between accounts, and beneficiaries.
 
 ## Tech Stack
 
@@ -115,6 +115,15 @@ Both endpoints are public (no token required).
 |---|---|---|
 | POST | `/` | Create a deposit or withdrawal |
 | GET | `/` | List transactions for an account |
+
+### Transfers — `/api/transfers`
+| Method | Path | Description |
+|---|---|---|
+| POST | `/` | Move money between two accounts (requires `MAKER` role) |
+
+Request body: `{ "fromAccountId": 1, "toAccountId": 2, "amount": 250.00, "description": "Rent" }`
+
+A transfer is all-or-nothing: it writes a `WITHDRAWAL` on the source account and a `DEPOSIT` on the destination, both with the same `reference`, in one database transaction. Both account rows are locked (lowest id first) so concurrent transfers can't overdraw an account or deadlock.
 
 ### Beneficiaries — `/api/beneficiaries`
 | Method | Path | Description |

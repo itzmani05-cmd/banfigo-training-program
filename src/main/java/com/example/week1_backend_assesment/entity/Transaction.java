@@ -25,6 +25,10 @@ public class Transaction {
     @Column(nullable = false)
     private LocalDateTime transactionDate;
 
+    // Shared by the debit and credit entries of a transfer; null for deposits/withdrawals
+    @Column(length = 36)
+    private String reference;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private BankAccount account;
@@ -84,6 +88,14 @@ public class Transaction {
 
     public void setTransactionDate(LocalDateTime transactionDate) {
         this.transactionDate = transactionDate;
+    }
+
+    public String getReference() {
+        return reference;
+    }
+
+    public void setReference(String reference) {
+        this.reference = reference;
     }
 
     public BankAccount getAccount() {

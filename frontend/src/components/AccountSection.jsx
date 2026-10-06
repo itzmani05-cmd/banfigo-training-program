@@ -95,7 +95,7 @@ export default function AccountSection() {
                 <td>{a.accountNumber}</td>
                 <td>{a.accountType}</td>
                 <td>{a.balance}</td>
-                <td>{a.customer?.id}</td>
+                <td>{a.customerId}</td>
                 <td>
                   <button onClick={() => setSelectedId(a.id)}>View</button>
                 </td>

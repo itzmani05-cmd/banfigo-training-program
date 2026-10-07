@@ -11,7 +11,6 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 public interface BankAccountRepository extends JpaRepository<BankAccount, Long> {
-    Optional<BankAccount> findByAccountNumber(String accountNumber);
     boolean existsByAccountNumber(String accountNumber);
 
     // SELECT ... FOR UPDATE: locks the account row until the transaction ends,

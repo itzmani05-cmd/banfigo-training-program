@@ -278,6 +278,10 @@ AWAITING_AUTHORISATION ──approve──▶ AUTHORISED ──revoke──▶ R
           └──reject──▶ REJECTED          └── (expiry passes) ──▶ EXPIRED
 ```
 
+## Testing with Postman
+
+The `postman/` folder has a ready-made collection (45 requests, automatic Keycloak tokens for `admin1` / `maker1` / `checker1`, pass/fail tests) and environments for the local and Docker setups, including 401 vs 403 and error-response checks. Step-by-step instructions: [`postman/README.md`](postman/README.md).
+
 ## Notes
 
 - Validation errors and "not found" errors return a consistent JSON error shape (see `GlobalExceptionHandler`).

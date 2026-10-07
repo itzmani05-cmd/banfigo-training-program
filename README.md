@@ -17,14 +17,28 @@ A simple banking backend (Spring Boot) with a React frontend, built for the Week
 
 ## Project Structure
 
+The backend is organised **by feature**: each business area is its own package, and inside it the code is split by layer.
+
 ```
-src/main/java/com/example/week1_backend_assesment/
-├── controller/    REST endpoints (HTTP layer only)
-├── service/       business logic
-├── repository/    Spring Data JPA interfaces (DB access)
-├── entity/        JPA entities (map to DB tables)
-├── dto/           request/response shapes for the API
-└── exception/     custom exceptions + global error handling
+src/main/java/com/example/banfigo/
+├── BanfigoApplication.java
+├── customer/
+│   ├── controller/    REST endpoints (HTTP layer only)
+│   ├── service/       business logic
+│   ├── repository/    Spring Data JPA interfaces (DB access)
+│   ├── entity/        JPA entities (map to DB tables)
+│   └── dto/           request/response shapes for the API
+├── account/           bank accounts and statements (PDF/CSV)
+├── transaction/       deposits and withdrawals
+├── transfer/          transfers between accounts and beneficiary payments
+├── beneficiary/       saved payees
+├── consent/           Open Banking consents (maker-checker approval)
+├── dashboard/         totals, recent activity, monthly money in/out
+└── common/
+    ├── config/        security (Keycloak JWT, role rules)
+    ├── controller/    /health and /api/info
+    ├── dto/           shared response shapes (pagination)
+    └── exception/     custom exceptions + global error handling
 
 frontend/
 ├── src/

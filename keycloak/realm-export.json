@@ -1,0 +1,96 @@
+{
+  "realm": "BanfigoNew",
+  "displayName": "Banfigo",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      {
+        "name": "ADMIN",
+        "description": "Manage customers and accounts, delete beneficiaries, approve/reject/revoke consents"
+      },
+      {
+        "name": "MAKER",
+        "description": "Create transactions and transfers, request consents"
+      },
+      {
+        "name": "CHECKER",
+        "description": "Delete beneficiaries, approve/reject/revoke consents"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "BanfigoFrontend",
+      "name": "Banfigo Frontend",
+      "description": "React single-page app. Public client: the browser can't keep a secret, so it uses Authorization Code + PKCE.",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "http://localhost:5173",
+      "baseUrl": "/",
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://localhost:8080/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://localhost:8080"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*##http://localhost:8080/*"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "admin1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Asha",
+      "lastName": "Admin",
+      "email": "admin1@banfigo.local",
+      "credentials": [
+        { "type": "password", "value": "admin123", "temporary": false }
+      ],
+      "realmRoles": ["ADMIN"]
+    },
+    {
+      "username": "maker1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Mani",
+      "lastName": "Maker",
+      "email": "maker1@banfigo.local",
+      "credentials": [
+        { "type": "password", "value": "maker123", "temporary": false }
+      ],
+      "realmRoles": ["MAKER"]
+    },
+    {
+      "username": "checker1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Chitra",
+      "lastName": "Checker",
+      "email": "checker1@banfigo.local",
+      "credentials": [
+        { "type": "password", "value": "checker123", "temporary": false }
+      ],
+      "realmRoles": ["CHECKER"]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Banking API
 
-A simple banking backend (Spring Boot) with a React frontend, built for the Week 1 backend assessment. Supports managing customers, bank accounts, transactions (deposit/withdrawal), transfers between accounts, and beneficiaries.
+Mini Banking / Open Banking Consent Management System: a Spring Boot backend and React frontend, secured with Keycloak and run behind an Nginx gateway with Docker Compose. Supports customers, bank accounts, transactions (deposit/withdrawal), transfers, beneficiaries, statements and Open Banking consents with maker-checker approval.
 
 ## Tech Stack
 
@@ -98,6 +98,85 @@ docker run -p 8082:8082 \
 ```
 
 Inside a container `localhost` refers to the container itself, so the datasource URL points to `host.docker.internal` to reach PostgreSQL running on your machine.
+
+## Run the Full Stack with Docker Compose
+
+One command starts PostgreSQL, Keycloak, the backend, the frontend and an Nginx gateway. Everything is reached through **http://localhost:8080**.
+
+```
+browser ──▶ nginx :8080 ─┬─ /         ─▶ frontend:80     React app (static build)
+                         ├─ /api/     ─▶ backend:8082    Spring Boot
+                         ├─ /health   ─▶ backend:8082
+                         └─ /auth/    ─▶ keycloak:8080   login + admin console
+backend ──▶ postgres:5432 (data), keycloak:8080 (token signing keys)
+```
+
+Only Nginx is published on your machine; the other containers talk to each other by service name on the Compose network.
+
+### Requirements
+
+- Docker Desktop (or Docker Engine with the Compose plugin)
+- Port **8080** free on your machine (see [Troubleshooting](#troubleshooting-docker))
+
+### Commands
+
+```bash
+docker compose up --build -d     # build images and start everything in the background
+docker compose ps                # status (keycloak takes ~30-60 s to become healthy)
+docker compose logs -f nginx     # gateway access log: request, status, which upstream answered
+docker compose logs -f backend   # Spring Boot log
+docker compose down              # stop (data is kept)
+docker compose down -v           # stop AND delete the database, Keycloak and log volumes
+```
+
+Then open:
+
+| URL | What |
+|---|---|
+| http://localhost:8080 | The app (redirects to the Keycloak login) |
+| http://localhost:8080/auth/admin | Keycloak admin console (`admin` / `admin`) |
+| http://localhost:8080/health | Backend + database health |
+
+### Logins
+
+The `BanfigoNew` realm is imported automatically from `keycloak/realm-export.json` on first start (client `BanfigoFrontend`, roles `ADMIN`, `MAKER`, `CHECKER`):
+
+| Username | Password | Role |
+|---|---|---|
+| `admin1` | `admin123` | ADMIN |
+| `maker1` | `maker123` | MAKER |
+| `checker1` | `checker123` | CHECKER |
+
+These are demo credentials for local use only.
+
+### How login works behind the gateway
+
+- Keycloak runs with `KC_HTTP_RELATIVE_PATH=/auth` and `KC_HOSTNAME=http://localhost:8080/auth`, so the login pages and the tokens it issues use the public gateway URL. Tokens carry `iss = http://localhost:8080/auth/realms/BanfigoNew`.
+- The frontend image is built with `VITE_KEYCLOAK_URL=/auth` (same origin as the app, through Nginx) and `VITE_API_BASE_URL=/api`.
+- The backend checks the token's issuer against the public URL (`SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI`) but downloads Keycloak's signing keys over the Docker network (`..._JWK_SET_URI=http://keycloak:8080/auth/realms/BanfigoNew/protocol/openid-connect/certs`). The role rules in `SecurityConfig` are unchanged.
+- These are environment variables in `docker-compose.yml`; `application.properties` and `frontend/.env` still describe the local (non-Docker) setup, which keeps working as before.
+
+### Data
+
+| Volume | Holds |
+|---|---|
+| `postgres_data` | Banking database (`student_db`). Starts empty; tables are created on first backend start. |
+| `keycloak_data` | Keycloak's own database (realm, users, sessions). The realm file is imported only when the realm doesn't exist yet, so changes made in the admin console survive restarts. |
+| `nginx_logs` | `access.log` / `error.log` (also printed to `docker compose logs nginx`) |
+
+The Docker database is separate from a PostgreSQL installed on your machine, so data from local development doesn't appear in Docker and vice versa.
+
+### Troubleshooting (Docker)
+
+- **`Bind for 0.0.0.0:8080 failed: port is already allocated`** — something else (often XAMPP/Apache `httpd`) uses port 8080. Stop it, or run on another port by creating a `.env` file next to `docker-compose.yml`:
+  ```properties
+  GATEWAY_PORT=8090
+  PUBLIC_URL=http://localhost:8090
+  ```
+  and add `http://localhost:8090/*` to the `BanfigoFrontend` client's redirect URIs and web origins in Keycloak (the realm file only allows 8080 and 5173).
+- **Every API call returns 401** — the token's issuer doesn't match `PUBLIC_URL`. Open the app with exactly the URL in `PUBLIC_URL` (`localhost`, not `127.0.0.1`).
+- **Realm changes in `realm-export.json` don't show up** — the import skips an existing realm. Run `docker compose down -v` to start Keycloak from scratch (this also wipes the Docker database).
+- **Backend keeps restarting at first start** — it waits for PostgreSQL and Keycloak to be healthy; check `docker compose ps` and `docker compose logs keycloak`.
 
 ## API Endpoints
 

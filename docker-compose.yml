@@ -1,0 +1,107 @@
+# Banfigo full stack: everything is reached through Nginx at http://localhost:8080
+#
+#   browser ──▶ nginx :8080 ─┬─ /        ─▶ frontend:80   (built React app)
+#                            ├─ /api/    ─▶ backend:8082  (Spring Boot)
+#                            └─ /auth/   ─▶ keycloak:8080 (login)
+#   backend ──▶ postgres:5432, keycloak:8080 (signing keys)
+#
+# Containers talk to each other by service name. Only Nginx is published on the host.
+#
+# GATEWAY_PORT / PUBLIC_URL can be overridden (e.g. in a .env file next to this one) if port 8080 is taken.
+# Keycloak's realm only allows logins redirected to http://localhost:8080 (and :5173 for local dev).
+
+name: banfigo
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: student_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d student_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.2
+    # start-dev: HTTP and the embedded database are fine for a local demo, not for production.
+    # --import-realm loads /opt/keycloak/data/import/*.json; a realm that already exists is skipped.
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Served under /auth so Nginx can route it, and it builds its links with the public URL
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_HOSTNAME: ${PUBLIC_URL:-http://localhost:8080}/auth
+      # Calls from other containers (http://keycloak:8080) are answered with internal URLs
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    healthcheck:
+      # The image has no curl; the management port (9000) serves /auth/health/ready
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      # First start builds Keycloak's runtime, which can take several minutes on a small Docker VM;
+      # failures during start_period don't count toward retries
+      start_period: 600s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/student_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      # Tokens are issued to the browser under the public URL, so that's the issuer to check...
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: ${PUBLIC_URL:-http://localhost:8080}/auth/realms/BanfigoNew
+      # ...but the signing keys are fetched from Keycloak directly over the Docker network
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/auth/realms/BanfigoNew/protocol/openid-connect/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+        # Relative: the browser calls Keycloak on the same origin, through Nginx
+        VITE_KEYCLOAK_URL: /auth
+        VITE_KEYCLOAK_REALM: BanfigoNew
+        VITE_KEYCLOAK_CLIENT_ID: BanfigoFrontend
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "${GATEWAY_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx/banfigo
+    depends_on:
+      - frontend
+      - backend
+      - keycloak
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  keycloak_data:
+  nginx_logs:

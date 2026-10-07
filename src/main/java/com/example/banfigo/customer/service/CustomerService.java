@@ -22,6 +22,7 @@ public class CustomerService {
         Customer savedCustomer=customerRespository.save(customer);
         return mapToResponse(savedCustomer);
     }
+    
     public List<CustomerResponse> getAllCustomers(){
         return customerRespository.findAll().stream()
             .map(this::mapToResponse)

@@ -7,3 +7,6 @@ frontend
 .vscode
 *.pdf
 HELP.md
+nginx
+keycloak
+docker-compose.yml

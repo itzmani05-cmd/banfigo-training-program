@@ -14,6 +14,8 @@ public interface ConsentRepository extends JpaRepository<Consent, Long> {
 
     List<Consent> findAllByOrderByCreatedAtDesc();
 
+    long countByCustomerId(Long customerId);
+
     List<Consent> findByStatusOrderByCreatedAtDesc(ConsentStatus status);
 
     // Marks pending/authorised consents whose expiry time has passed as EXPIRED. Returns the number updated.

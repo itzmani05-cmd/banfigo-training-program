@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface BankAccountRepository extends JpaRepository<BankAccount, Long> {
     boolean existsByAccountNumber(String accountNumber);
 
+    long countByCustomerId(Long customerId);
+
     // SELECT ... FOR UPDATE: locks the account row until the transaction ends,
     // so concurrent balance updates on the same account run one after another.
     // Returns only the id, so no unlocked copy of the account ends up in the persistence context

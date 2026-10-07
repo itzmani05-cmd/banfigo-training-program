@@ -2,8 +2,8 @@ import Keycloak from 'keycloak-js';
 
 const keycloak = new Keycloak({
   url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8086',
-  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'Banfigo',
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'banfigo-frontend',
+  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'BanfigoNew',
+  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'BanfigoFrontend',
 });
 
 // Redirects to the Keycloak login page if the user isn't signed in.

@@ -22,14 +22,15 @@ const TABS = [
 // Only the app's own roles, not Keycloak defaults like offline_access
 const APP_ROLES = ['ADMIN', 'MAKER', 'CHECKER'];
 
-function Brand() {
+// Logo sits on a white tile so its dark-blue parts stay visible on the black background
+function Brand({ large = false }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-paper p-1">
-        <img src="/logo.png" alt="" className="size-full object-contain" />
+      <span className={`grid shrink-0 place-items-center rounded-xl bg-paper p-1.5 ${large ? 'size-12' : 'size-10'}`}>
+        <img src="/logo.png" alt="Banfigo logo" className="size-full object-contain" />
       </span>
       <div className="leading-tight">
-        <div className="font-bold text-paper">Banfigo</div>
+        <div className={`font-bold text-paper ${large ? 'text-title' : ''}`}>Banfigo</div>
         <div className="text-caption text-paper/60">Banking Console</div>
       </div>
     </div>
@@ -87,7 +88,7 @@ function SidebarContent({ active, onSelect, user, roles }) {
   return (
     <div className="flex h-full flex-col gap-6 p-4">
       <div className="px-2 pt-2">
-        <Brand />
+        <Brand large />
       </div>
       <nav className="flex-1 overflow-y-auto" aria-label="Main">
         <NavItems active={active} onSelect={onSelect} />

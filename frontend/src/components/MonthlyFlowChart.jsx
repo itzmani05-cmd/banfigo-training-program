@@ -1,17 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { money } from '../format';
+import { Table, Td } from './ui';
 
 // Grouped bars: money in vs money out per month. Colors are validated for color-blind separation.
-const WIDTH = 760;
-const HEIGHT = 260;
-const MARGIN = { top: 12, right: 8, bottom: 28, left: 56 };
-const PLOT_W = WIDTH - MARGIN.left - MARGIN.right;
-const PLOT_H = HEIGHT - MARGIN.top - MARGIN.bottom;
+// The SVG is drawn at the container's real pixel width (not scaled), so labels stay 12px on phones.
+const MARGIN = { top: 12, right: 8, bottom: 28, left: 48 };
 const BAR_GAP = 2;
 
+// Tracks an element's width; starts at a desktop-ish default until the first measurement
+function useWidth(ref, initial = 760) {
+  const [width, setWidth] = useState(initial);
+  useEffect(() => {
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)));
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [ref]);
+  return width;
+}
+
 const SERIES = [
-  { key: 'moneyIn', label: 'Money in', color: 'var(--series-in)' },
-  { key: 'moneyOut', label: 'Money out', color: 'var(--series-out)' },
+  { key: 'moneyIn', label: 'Money in', color: 'var(--color-series-in)' },
+  { key: 'moneyOut', label: 'Money out', color: 'var(--color-series-out)' },
 ];
 
 const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 2 });
@@ -36,37 +45,42 @@ const barPath = (x, y, w, h) => {
 
 export default function MonthlyFlowChart({ flows }) {
   const [hovered, setHovered] = useState(null);
+  const wrapRef = useRef(null);
+  const width = Math.max(useWidth(wrapRef), 260);
+  const height = width < 500 ? 200 : 260;
+  const plotW = width - MARGIN.left - MARGIN.right;
+  const plotH = height - MARGIN.top - MARGIN.bottom;
 
   const values = flows.map((f) => ({ ...f, moneyIn: Number(f.moneyIn), moneyOut: Number(f.moneyOut) }));
   const max = niceMax(Math.max(0, ...values.flatMap((f) => [f.moneyIn, f.moneyOut])));
   const isEmpty = values.every((f) => f.moneyIn === 0 && f.moneyOut === 0);
   // With no data, a scale would be meaningless: draw just the baseline
   const ticks = isEmpty ? [0] : [0, 0.25, 0.5, 0.75, 1].map((t) => t * max);
-  const y = (v) => MARGIN.top + PLOT_H - (v / max) * PLOT_H;
+  const y = (v) => MARGIN.top + plotH - (v / max) * plotH;
 
-  const groupW = PLOT_W / values.length;
+  const groupW = plotW / values.length;
   const barW = Math.min(28, (groupW * 0.6 - BAR_GAP) / 2);
 
   return (
-    <div className="viz-root">
-      <div className="legend">
+    <div>
+      <div className="mb-2 flex gap-4 text-label">
         {SERIES.map((s) => (
-          <span key={s.key} className="legend-item">
-            <span className="legend-swatch" style={{ background: s.color }} />
+          <span key={s.key} className="inline-flex items-center gap-1.5">
+            <span className="inline-block size-3 rounded-sm" style={{ background: s.color }} />
             {s.label}
           </span>
         ))}
       </div>
 
-      <div className="chart-wrap">
-        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Money in and money out per month">
+      <div className="relative" ref={wrapRef}>
+        <svg viewBox={`0 0 ${width} ${height}`} className="block h-auto w-full" role="img" aria-label="Money in and money out per month">
           {ticks.map((t) => (
             <g key={t}>
               <line
-                x1={MARGIN.left} x2={WIDTH - MARGIN.right} y1={y(t)} y2={y(t)}
-                stroke={t === 0 ? 'var(--axis)' : 'var(--grid)'} strokeWidth="1"
+                x1={MARGIN.left} x2={width - MARGIN.right} y1={y(t)} y2={y(t)}
+                stroke={t === 0 ? 'var(--color-axis)' : 'var(--color-line)'} strokeWidth="1"
               />
-              <text x={MARGIN.left - 8} y={y(t)} dy="0.32em" textAnchor="end" className="axis-label">
+              <text x={MARGIN.left - 8} y={y(t)} dy="0.32em" textAnchor="end" className="fill-subtle text-caption">
                 {compact.format(t)}
               </text>
             </g>
@@ -78,24 +92,24 @@ export default function MonthlyFlowChart({ flows }) {
             return (
               <g key={f.month}>
                 {SERIES.map((s, j) => {
-                  const h = (f[s.key] / max) * PLOT_H;
+                  const h = (f[s.key] / max) * plotH;
                   if (h <= 0) return null;
                   const x = j === 0 ? center - BAR_GAP / 2 - barW : center + BAR_GAP / 2;
                   return (
                     <path
                       key={s.key}
-                      d={barPath(x, MARGIN.top + PLOT_H - h, barW, h)}
+                      d={barPath(x, MARGIN.top + plotH - h, barW, h)}
                       fill={s.color}
                       opacity={hovered === null || hovered === i ? 1 : 0.45}
                     />
                   );
                 })}
-                <text x={center} y={HEIGHT - 8} textAnchor="middle" className="axis-label">
+                <text x={center} y={height - 8} textAnchor="middle" className="fill-subtle text-caption">
                   {monthLabel(f.month, false)}
                 </text>
                 {/* Hit target covers the whole month column, larger than the bars */}
                 <rect
-                  x={groupX} y={MARGIN.top} width={groupW} height={PLOT_H}
+                  x={groupX} y={MARGIN.top} width={groupW} height={plotH}
                   fill="transparent"
                   onMouseEnter={() => setHovered(i)}
                   onMouseLeave={() => setHovered(null)}
@@ -105,19 +119,19 @@ export default function MonthlyFlowChart({ flows }) {
           })}
         </svg>
 
-        {isEmpty && <p className="chart-empty">No transactions in the last {values.length} months.</p>}
+        {isEmpty && <p className="pointer-events-none absolute inset-0 m-0 flex items-center justify-center text-muted italic">No transactions in the last {values.length} months.</p>}
 
         {hovered !== null && (
           <div
-            className="chart-tooltip"
-            style={{ left: `${((MARGIN.left + (hovered + 0.5) * groupW) / WIDTH) * 100}%` }}
+            className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-md border border-line bg-paper px-3 py-2 text-label whitespace-nowrap shadow-md"
+            style={{ left: `${((MARGIN.left + (hovered + 0.5) * groupW) / width) * 100}%` }}
           >
             <strong>{monthLabel(values[hovered].month, true)}</strong>
             {SERIES.map((s) => (
-              <div key={s.key} className="tooltip-row">
-                <span className="legend-swatch" style={{ background: s.color }} />
+              <div key={s.key} className="mt-1 flex items-center gap-1.5">
+                <span className="inline-block size-3 rounded-sm" style={{ background: s.color }} />
                 <span>{s.label}</span>
-                <span className="tooltip-value">{money(values[hovered][s.key])}</span>
+                <span className="ml-auto pl-3 font-bold tabular-nums">{money(values[hovered][s.key])}</span>
               </div>
             ))}
           </div>
@@ -125,25 +139,18 @@ export default function MonthlyFlowChart({ flows }) {
       </div>
 
       <details>
-        <summary>Show as table</summary>
-        <table>
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>Money in</th>
-              <th>Money out</th>
-            </tr>
-          </thead>
-          <tbody>
+        <summary className="mt-3 cursor-pointer text-label text-muted hover:text-ink">Show as table</summary>
+        <div className="mt-3">
+          <Table columns={['Month', '>Money in', '>Money out']}>
             {values.map((f) => (
               <tr key={f.month}>
-                <td>{monthLabel(f.month, true)}</td>
-                <td>{money(f.moneyIn)}</td>
-                <td>{money(f.moneyOut)}</td>
+                <Td>{monthLabel(f.month, true)}</Td>
+                <Td className="text-right tabular-nums">{money(f.moneyIn)}</Td>
+                <Td className="text-right tabular-nums">{money(f.moneyOut)}</Td>
               </tr>
             ))}
-          </tbody>
-        </table>
+          </Table>
+        </div>
       </details>
     </div>
   );

@@ -6,7 +6,8 @@ React + Vite frontend for the Mini Banking API. It lets you manage customers, ba
 
 - React 19
 - Vite
-- Plain `fetch` for API calls (no UI framework)
+- Tailwind CSS v4 for styling (design tokens in `src/index.css`, shared components in `src/components/ui.jsx`)
+- Plain `fetch` for API calls
 - Oxlint for linting
 
 ## Prerequisites

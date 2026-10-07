@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { AccountApi, BeneficiaryApi, TransferApi } from '../api';
+import { money } from '../format';
+import { can, rolesFor } from '../permissions';
+import { Alert, Button, Card, DetailList, Field, FormActions, FormGrid, PageHeader, Tabs, ViewOnly, inputClass } from './ui';
 
 const EMPTY_FORM = { fromAccountId: '', toAccountId: '', beneficiaryId: '', amount: '', description: '' };
 
@@ -77,115 +80,109 @@ export default function TransferSection() {
 
   return (
     <div>
-      <div className="section-title">
-        <h2>Transfers</h2>
-      </div>
+      <PageHeader title="Transfers" description="Move money between accounts or pay a saved beneficiary." />
 
-      {error && <div className="message">{error}</div>}
-
-      <div className="row-actions" style={{ marginBottom: 16 }}>
-        <button className={mode === 'account' ? 'active' : ''} onClick={() => switchMode('account')}>
-          To account
-        </button>
-        <button className={mode === 'beneficiary' ? 'active' : ''} onClick={() => switchMode('beneficiary')}>
-          Pay beneficiary
-        </button>
-      </div>
-
-      <form className="form-grid" onSubmit={handleSubmit}>
-        <div className="field">
-          <label>From Account</label>
-          <select value={form.fromAccountId} onChange={handleChange('fromAccountId')} required>
-            <option value="">Select account</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>{accountLabel(a)}</option>
-            ))}
-          </select>
-        </div>
-
-        {mode === 'account' ? (
-          <div className="field">
-            <label>To Account</label>
-            <select value={form.toAccountId} onChange={handleChange('toAccountId')} required>
-              <option value="">Select account</option>
-              {accounts
-                .filter((a) => String(a.id) !== form.fromAccountId)
-                .map((a) => (
-                  <option key={a.id} value={a.id}>{accountLabel(a)}</option>
-                ))}
-            </select>
-          </div>
-        ) : (
-          <div className="field">
-            <label>Beneficiary</label>
-            <select
-              value={form.beneficiaryId}
-              onChange={handleChange('beneficiaryId')}
-              required
-              disabled={!fromAccount}
-            >
-              <option value="">
-                {!fromAccount
-                  ? 'Select a source account first'
-                  : ownBeneficiaries.length === 0
-                    ? 'No beneficiaries saved for this customer'
-                    : 'Select beneficiary'}
-              </option>
-              {ownBeneficiaries.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} - {b.bankName} A/C {b.accountNumber}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div className="field">
-          <label>Amount</label>
-          <input type="number" min="0.01" step="0.01" value={form.amount} onChange={handleChange('amount')} required />
-        </div>
-        <div className="field">
-          <label>Description</label>
-          <input value={form.description} onChange={handleChange('description')} maxLength={200} />
-        </div>
-        <button type="submit" className="primary" disabled={loading}>
-          {loading ? 'Transferring...' : 'Transfer'}
-        </button>
-      </form>
+      <Alert>{error}</Alert>
 
       {result && (
-        <table>
-          <tbody>
-            <tr>
-              <th>Reference</th>
-              <td>{result.reference}</td>
-            </tr>
-            <tr>
-              <th>From Account</th>
-              <td>{result.fromAccountId}</td>
-            </tr>
-            <tr>
-              <th>To</th>
-              <td>
-                {result.beneficiaryName
-                  ? `${result.beneficiaryName} (A/C ${result.toAccountNumber})`
-                  : `A/C ${result.toAccountNumber}`}
-              </td>
-            </tr>
-            <tr>
-              <th>Amount</th>
-              <td>{result.amount}</td>
-            </tr>
-            <tr>
-              <th>Source Balance After</th>
-              <td>{result.fromAccountBalance}</td>
-            </tr>
-            <tr>
-              <th>Date</th>
-              <td>{result.transferDate}</td>
-            </tr>
-          </tbody>
-        </table>
+        <Card title="Transfer complete" actions={<span className="text-label text-muted">Ref {result.reference}</span>}>
+          <DetailList
+            items={[
+              ['Amount', money(result.amount)],
+              ['From Account', result.fromAccountId],
+              ['To', result.beneficiaryName
+                ? `${result.beneficiaryName} (A/C ${result.toAccountNumber})`
+                : `A/C ${result.toAccountNumber}`],
+              ['Source Balance After', money(result.fromAccountBalance)],
+              ['Date', result.transferDate.replace('T', ' ').slice(0, 16)],
+            ]}
+          />
+        </Card>
+      )}
+
+      {!can('createTransfer') ? (
+        <ViewOnly>Making transfers requires the {rolesFor('createTransfer')} role.</ViewOnly>
+      ) : (
+        <Card
+          title="New transfer"
+          actions={
+            <Tabs
+              value={mode}
+              onChange={switchMode}
+              options={[
+                { value: 'account', label: 'To account' },
+                { value: 'beneficiary', label: 'Pay beneficiary' },
+              ]}
+            />
+          }
+        >
+          <FormGrid onSubmit={handleSubmit}>
+            <Field label="From Account">
+              <select className={inputClass} value={form.fromAccountId} onChange={handleChange('fromAccountId')} required>
+                <option value="">Select account</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>{accountLabel(a)}</option>
+                ))}
+              </select>
+            </Field>
+
+            {mode === 'account' ? (
+              <Field label="To Account">
+                <select className={inputClass} value={form.toAccountId} onChange={handleChange('toAccountId')} required>
+                  <option value="">Select account</option>
+                  {accounts
+                    .filter((a) => String(a.id) !== form.fromAccountId)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>{accountLabel(a)}</option>
+                    ))}
+                </select>
+              </Field>
+            ) : (
+              <Field label="Beneficiary">
+                <select
+                  className={inputClass}
+                  value={form.beneficiaryId}
+                  onChange={handleChange('beneficiaryId')}
+                  required
+                  disabled={!fromAccount}
+                >
+                  <option value="">
+                    {!fromAccount
+                      ? 'Select a source account first'
+                      : ownBeneficiaries.length === 0
+                        ? 'No beneficiaries saved for this customer'
+                        : 'Select beneficiary'}
+                  </option>
+                  {ownBeneficiaries.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} - {b.bankName} A/C {b.accountNumber}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+
+            <Field label="Amount">
+              <input
+                className={inputClass}
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={form.amount}
+                onChange={handleChange('amount')}
+                required
+              />
+            </Field>
+            <Field label="Description">
+              <input className={inputClass} value={form.description} onChange={handleChange('description')} maxLength={200} />
+            </Field>
+            <FormActions>
+              <Button type="submit" variant="primary" disabled={loading}>
+                {loading ? 'Transferring...' : 'Transfer'}
+              </Button>
+            </FormActions>
+          </FormGrid>
+        </Card>
       )}
     </div>
   );

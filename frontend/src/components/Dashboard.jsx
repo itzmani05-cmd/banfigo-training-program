@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { DashboardApi } from '../api';
 import MonthlyFlowChart from './MonthlyFlowChart';
 import { money } from '../format';
+import { Alert, Button, Card, Empty, PageHeader, StatTile, Table, Td, TransactionTypeBadge } from './ui';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -22,62 +23,43 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="section-title">
-        <h2>Dashboard</h2>
-        <button onClick={load}>Refresh</button>
-      </div>
+      <PageHeader title="Dashboard" description="Overview of balances and recent activity across the bank.">
+        <Button icon="refresh" onClick={load}>Refresh</Button>
+      </PageHeader>
 
-      {error && <div className="message">{error}</div>}
+      <Alert>{error}</Alert>
 
       {!data ? (
-        !error && <p className="empty">Loading...</p>
+        !error && <Empty>Loading...</Empty>
       ) : (
         <>
-          <div className="stat-grid">
-            <div className="stat-tile">
-              <div className="stat-label">Total balance</div>
-              <div className="stat-value">{money(data.totalBalance)}</div>
-            </div>
-            <div className="stat-tile">
-              <div className="stat-label">Accounts</div>
-              <div className="stat-value">{data.accountCount}</div>
-            </div>
-            <div className="stat-tile">
-              <div className="stat-label">Customers</div>
-              <div className="stat-value">{data.customerCount}</div>
-            </div>
+          <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <StatTile label="Total balance" value={money(data.totalBalance)} icon="wallet" highlight className="sm:col-span-2 xl:col-span-1" />
+            <StatTile label="Accounts" value={data.accountCount} icon="accounts" />
+            <StatTile label="Customers" value={data.customerCount} icon="customers" />
           </div>
 
-          <h3>Money in vs money out (last {data.monthlyFlows.length} months)</h3>
-          <MonthlyFlowChart flows={data.monthlyFlows} />
+          <Card title="Money in vs money out" subtitle={`Last ${data.monthlyFlows.length} months`}>
+            <MonthlyFlowChart flows={data.monthlyFlows} />
+          </Card>
 
-          <h3>Recent transactions</h3>
-          {data.recentTransactions.length === 0 ? (
-            <p className="empty">No transactions yet.</p>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Account</th>
-                  <th>Type</th>
-                  <th>Amount</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
+          <Card title="Recent transactions" subtitle="The 10 latest across all accounts">
+            {data.recentTransactions.length === 0 ? (
+              <Empty>No transactions yet.</Empty>
+            ) : (
+              <Table columns={['Date', 'Account', 'Type', 'Description', '>Amount']}>
                 {data.recentTransactions.map((t) => (
-                  <tr key={t.id}>
-                    <td>{t.transactionDate.replace('T', ' ').slice(0, 16)}</td>
-                    <td>{t.accountNumber}</td>
-                    <td>{t.transactionType}</td>
-                    <td>{money(t.amount)}</td>
-                    <td>{t.description || '-'}</td>
+                  <tr key={t.id} className="hover:bg-wash/60">
+                    <Td className="whitespace-nowrap text-muted">{t.transactionDate.replace('T', ' ').slice(0, 16)}</Td>
+                    <Td className="tabular-nums">{t.accountNumber}</Td>
+                    <Td><TransactionTypeBadge type={t.transactionType} /></Td>
+                    <Td>{t.description || '-'}</Td>
+                    <Td className="text-right font-bold tabular-nums">{money(t.amount)}</Td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          )}
+              </Table>
+            )}
+          </Card>
         </>
       )}
     </div>

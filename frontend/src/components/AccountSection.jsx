@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { AccountApi } from '../api';
+import { money } from '../format';
 import AccountDetails from './AccountDetails';
+import { can, rolesFor } from '../permissions';
+import { Alert, Badge, Button, Card, Empty, Field, FormActions, FormGrid, PageHeader, Table, Td, ViewOnly, inputClass } from './ui';
 
 const EMPTY_FORM = { accountNumber: '', accountType: '', customerId: '' };
 
@@ -52,58 +55,59 @@ export default function AccountSection() {
 
   return (
     <div>
-      <h2>Bank Accounts</h2>
+      <PageHeader title="Bank Accounts" description="Open new accounts and view balances and history." />
 
-      {error && <div className="message">{error}</div>}
+      <Alert>{error}</Alert>
 
-      <form className="form-grid" onSubmit={handleSubmit}>
-        <div className="field">
-          <label>Account Number (10 digits)</label>
-          <input value={form.accountNumber} onChange={handleChange('accountNumber')} required />
-        </div>
-        <div className="field">
-          <label>Account Type</label>
-          <input value={form.accountType} onChange={handleChange('accountType')} placeholder="SAVINGS / CURRENT" required />
-        </div>
-        <div className="field">
-          <label>Customer ID</label>
-          <input type="number" value={form.customerId} onChange={handleChange('customerId')} required />
-        </div>
-        <button type="submit" className="primary" disabled={loading}>
-          {loading ? 'Creating...' : 'Create Account'}
-        </button>
-      </form>
-
-      {accounts.length === 0 ? (
-        <p className="empty">No accounts yet.</p>
+      {can('createAccount') ? (
+        <Card title="Open account">
+          <FormGrid onSubmit={handleSubmit}>
+            <Field label="Account Number" hint="10 digits">
+              <input className={inputClass} value={form.accountNumber} onChange={handleChange('accountNumber')} required />
+            </Field>
+            <Field label="Account Type">
+              <input
+                className={inputClass}
+                value={form.accountType}
+                onChange={handleChange('accountType')}
+                placeholder="SAVINGS / CURRENT"
+                required
+              />
+            </Field>
+            <Field label="Customer ID">
+              <input className={inputClass} type="number" value={form.customerId} onChange={handleChange('customerId')} required />
+            </Field>
+            <FormActions>
+              <Button type="submit" variant="primary" disabled={loading}>
+                {loading ? 'Creating...' : 'Create Account'}
+              </Button>
+            </FormActions>
+          </FormGrid>
+        </Card>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Account Number</th>
-              <th>Type</th>
-              <th>Balance</th>
-              <th>Customer ID</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
+        <ViewOnly>Opening accounts requires the {rolesFor('createAccount')} role.</ViewOnly>
+      )}
+
+      <Card title={`All accounts (${accounts.length})`}>
+        {accounts.length === 0 ? (
+          <Empty>No accounts yet.</Empty>
+        ) : (
+          <Table columns={['ID', 'Account Number', 'Type', 'Customer', '>Balance', '']}>
             {accounts.map((a) => (
-              <tr key={a.id}>
-                <td>{a.id}</td>
-                <td>{a.accountNumber}</td>
-                <td>{a.accountType}</td>
-                <td>{a.balance}</td>
-                <td>{a.customerId}</td>
-                <td>
-                  <button onClick={() => setSelectedId(a.id)}>View</button>
-                </td>
+              <tr key={a.id} className="hover:bg-wash/60">
+                <Td className="text-muted">{a.id}</Td>
+                <Td className="font-bold tabular-nums">{a.accountNumber}</Td>
+                <Td><Badge>{a.accountType}</Badge></Td>
+                <Td>{a.customerName || `Customer ${a.customerId}`}</Td>
+                <Td className="text-right font-bold tabular-nums">{money(a.balance)}</Td>
+                <Td className="text-right">
+                  <Button size="sm" onClick={() => setSelectedId(a.id)}>View</Button>
+                </Td>
               </tr>
             ))}
-          </tbody>
-        </table>
-      )}
+          </Table>
+        )}
+      </Card>
     </div>
   );
 }

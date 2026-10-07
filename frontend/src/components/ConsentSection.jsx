@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { AccountApi, ConsentApi, CustomerApi } from '../api';
 import { getUser } from '../auth';
+import { can, rolesFor } from '../permissions';
+import { Alert, Badge, Button, Card, Empty, Field, FormActions, FormGrid, PageHeader, Table, Td, ViewOnly, inputClass } from './ui';
 
 const PERMISSIONS = [
   { key: 'READ_ACCOUNTS', label: 'Read accounts' },
@@ -22,10 +24,32 @@ const emptyForm = () => ({ customerId: '', tppName: '', permissions: [], account
 
 const formatDate = (value) => (value ? new Date(value).toLocaleString() : '');
 
+const STATUS_TONES = { AWAITING_AUTHORISATION: 'outline', AUTHORISED: 'solid' };
+const statusLabel = (status) => (status === 'AWAITING_AUTHORISATION' ? 'AWAITING' : status);
+
+// Checkbox group; a fieldset because a <label> can't wrap several inputs
+function CheckGroup({ legend, children, className = '' }) {
+  return (
+    <fieldset className={`rounded-md border border-line px-4 pt-2 pb-3 ${className}`}>
+      <legend className="px-1 text-label font-bold">{legend}</legend>
+      <div className="grid gap-2 sm:grid-cols-2">{children}</div>
+    </fieldset>
+  );
+}
+
+function Check({ checked, onChange, children }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2">
+      <input type="checkbox" checked={checked} onChange={onChange} className="size-4 accent-ink" />
+      {children}
+    </label>
+  );
+}
+
 export default function ConsentSection() {
-  const { username, roles } = getUser();
-  const canCreate = roles.includes('MAKER');
-  const canDecide = roles.includes('ADMIN') || roles.includes('CHECKER');
+  const { username } = getUser();
+  const canCreate = can('requestConsent');
+  const canDecide = can('decideConsent');
 
   const [consents, setConsents] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -120,127 +144,130 @@ export default function ConsentSection() {
 
   return (
     <div>
-      <h2>Consents</h2>
-      <p>
-        A third-party provider (TPP) asks for access to a customer&apos;s accounts. A <b>MAKER</b> raises the
-        request, then a different <b>CHECKER</b> or <b>ADMIN</b> approves or rejects it.
-      </p>
+      <PageHeader
+        title="Consents"
+        description="A third-party provider (TPP) asks for access to a customer's accounts. A MAKER raises the request, then a different CHECKER or ADMIN approves or rejects it."
+      />
 
-      {error && <div className="message">{error}</div>}
+      <Alert>{error}</Alert>
 
-      {canCreate && (
-        <form className="form-grid" onSubmit={handleSubmit}>
-          <h3>New consent request</h3>
-          <div className="field">
-            <label>Customer</label>
-            <select value={form.customerId} onChange={handleChange('customerId')} required>
-              <option value="">Select a customer</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.id} - {c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Third-party provider</label>
-            <input value={form.tppName} onChange={handleChange('tppName')} placeholder="e.g. Budget App Ltd" required />
-          </div>
-          <fieldset className="field">
-            <legend>Accounts</legend>
-            {!form.customerId && <span className="empty">Select a customer first.</span>}
-            {form.customerId && customerAccounts.length === 0 && <span className="empty">This customer has no accounts.</span>}
-            {customerAccounts.map((a) => (
-              <label key={a.id} className="check">
-                <input type="checkbox" checked={form.accountIds.includes(a.id)} onChange={toggle('accountIds', a.id)} />
-                {a.accountNumber} ({a.accountType})
-              </label>
-            ))}
-          </fieldset>
-          <fieldset className="field">
-            <legend>Permissions</legend>
-            {PERMISSIONS.map((p) => (
-              <label key={p.key} className="check">
-                <input type="checkbox" checked={form.permissions.includes(p.key)} onChange={toggle('permissions', p.key)} />
-                {p.label}
-              </label>
-            ))}
-          </fieldset>
-          <div className="field">
-            <label>Expires at</label>
-            <input type="datetime-local" value={form.expiresAt} onChange={handleChange('expiresAt')} required />
-          </div>
-          <button type="submit" className="primary" disabled={loading}>
-            {loading ? 'Submitting...' : 'Request Consent'}
-          </button>
-        </form>
+      {!canCreate && !canDecide && (
+        <ViewOnly>
+          You can view consents. Requesting one requires the {rolesFor('requestConsent')} role; approving, rejecting or
+          revoking requires {rolesFor('decideConsent')}.
+        </ViewOnly>
       )}
 
-      <div className="section-title">
-        <h3>Consent requests</h3>
-        <select value={statusFilter} onChange={handleFilter} aria-label="Filter by status">
-          <option value="">All statuses</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-      </div>
+      {canCreate && (
+        <Card title="New consent request">
+          <FormGrid onSubmit={handleSubmit}>
+            <Field label="Customer">
+              <select className={inputClass} value={form.customerId} onChange={handleChange('customerId')} required>
+                <option value="">Select a customer</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>{c.id} - {c.name}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Third-party provider">
+              <input className={inputClass} value={form.tppName} onChange={handleChange('tppName')} placeholder="e.g. Budget App Ltd" required />
+            </Field>
+            <CheckGroup legend="Accounts">
+              {!form.customerId && <span className="text-muted italic">Select a customer first.</span>}
+              {form.customerId && customerAccounts.length === 0 && <span className="text-muted italic">This customer has no accounts.</span>}
+              {customerAccounts.map((a) => (
+                <Check key={a.id} checked={form.accountIds.includes(a.id)} onChange={toggle('accountIds', a.id)}>
+                  <span className="tabular-nums">{a.accountNumber}</span>
+                  <span className="text-muted">({a.accountType})</span>
+                </Check>
+              ))}
+            </CheckGroup>
+            <CheckGroup legend="Permissions">
+              {PERMISSIONS.map((p) => (
+                <Check key={p.key} checked={form.permissions.includes(p.key)} onChange={toggle('permissions', p.key)}>
+                  {p.label}
+                </Check>
+              ))}
+            </CheckGroup>
+            <Field label="Expires at">
+              <input className={inputClass} type="datetime-local" value={form.expiresAt} onChange={handleChange('expiresAt')} required />
+            </Field>
+            <FormActions>
+              <Button type="submit" variant="primary" disabled={loading}>
+                {loading ? 'Submitting...' : 'Request Consent'}
+              </Button>
+            </FormActions>
+          </FormGrid>
+        </Card>
+      )}
 
-      {consents.length === 0 ? (
-        <p className="empty">No consents found.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Customer</th>
-              <th>Provider</th>
-              <th>Accounts</th>
-              <th>Permissions</th>
-              <th>Status</th>
-              <th>Expires</th>
-              <th>Requested by</th>
-              <th>Decided by</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
+      <Card
+        title={`Consent requests (${consents.length})`}
+        actions={
+          <select className={`${inputClass} w-auto`} value={statusFilter} onChange={handleFilter} aria-label="Filter by status">
+            <option value="">All statuses</option>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        }
+      >
+        {consents.length === 0 ? (
+          <Empty>No consents found.</Empty>
+        ) : (
+          <Table columns={['ID', 'Customer / Provider', 'Access', 'Status', 'Expires', 'Requested / Decided', ...(canDecide ? [''] : [])]}>
             {consents.map((c) => {
               const pending = c.status === 'AWAITING_AUTHORISATION';
               const ownRequest = c.createdBy === username;
               return (
-                <tr key={c.id}>
-                  <td>{c.id}</td>
-                  <td>{c.customerName}</td>
-                  <td>{c.tppName}</td>
-                  <td>{c.accountNumbers.join(', ')}</td>
-                  <td>{c.permissions.join(', ')}</td>
-                  <td>
-                    {c.status}
-                    {c.rejectionReason && <div className="empty">{c.rejectionReason}</div>}
-                  </td>
-                  <td>{formatDate(c.expiresAt)}</td>
-                  <td>{c.createdBy}</td>
-                  <td>{c.decidedBy && `${c.decidedBy}, ${formatDate(c.decidedAt)}`}</td>
-                  <td>
-                    {canDecide && pending && (
-                      <div className="row-actions">
-                        <button
-                          onClick={decide(c, 'approve')}
-                          disabled={ownRequest}
-                          title={ownRequest ? 'You raised this request, so another user must decide it' : ''}
-                        >
-                          Approve
-                        </button>
-                        <button onClick={decide(c, 'reject')} disabled={ownRequest}>Reject</button>
-                      </div>
-                    )}
-                    {canDecide && c.status === 'AUTHORISED' && <button onClick={decide(c, 'revoke')}>Revoke</button>}
-                  </td>
+                <tr key={c.id} className="hover:bg-wash/60">
+                  <Td className="text-muted">{c.id}</Td>
+                  <Td>
+                    <div className="font-bold">{c.customerName}</div>
+                    <div className="text-muted">{c.tppName}</div>
+                  </Td>
+                  <Td>
+                    <div className="tabular-nums">{c.accountNumbers.join(', ')}</div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {c.permissions.map((p) => <Badge key={p}>{p.replace('READ_', '')}</Badge>)}
+                    </div>
+                  </Td>
+                  <Td>
+                    <Badge tone={STATUS_TONES[c.status]}>{statusLabel(c.status)}</Badge>
+                    {c.rejectionReason && <div className="mt-1 text-label text-muted italic">{c.rejectionReason}</div>}
+                  </Td>
+                  <Td className="whitespace-nowrap text-muted">{formatDate(c.expiresAt)}</Td>
+                  <Td className="text-label">
+                    <div>{c.createdBy}</div>
+                    {c.decidedBy && <div className="text-muted">{c.decidedBy}, {formatDate(c.decidedAt)}</div>}
+                  </Td>
+                  {canDecide && (
+                    <Td className="text-right">
+                      {pending && (
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={decide(c, 'approve')}
+                            disabled={ownRequest}
+                            title={ownRequest ? 'You raised this request, so another user must decide it' : ''}
+                          >
+                            Approve
+                          </Button>
+                          <Button size="sm" onClick={decide(c, 'reject')} disabled={ownRequest}>Reject</Button>
+                        </div>
+                      )}
+                      {c.status === 'AUTHORISED' && (
+                        <Button size="sm" variant="ghost" onClick={decide(c, 'revoke')}>Revoke</Button>
+                      )}
+                    </Td>
+                  )}
                 </tr>
               );
             })}
-          </tbody>
-        </table>
-      )}
+          </Table>
+        )}
+      </Card>
     </div>
   );
 }

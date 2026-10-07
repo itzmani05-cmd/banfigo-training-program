@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { CustomerApi } from '../api';
+import { can, rolesFor } from '../permissions';
+import { Alert, Button, Card, Empty, Field, FormActions, FormGrid, PageHeader, Table, Td, ViewOnly, inputClass } from './ui';
 
 const EMPTY_FORM = { name: '', email: '', phone: '', address: '' };
 
 export default function CustomerSection() {
+  const canManage = can('manageCustomers');
   const [customers, setCustomers] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
@@ -73,72 +76,64 @@ export default function CustomerSection() {
 
   return (
     <div>
-      <h2>Customers</h2>
+      <PageHeader title="Customers" description="People who hold accounts with the bank." />
 
-      {error && <div className="message">{error}</div>}
+      <Alert>{error}</Alert>
 
-      <form className="form-grid" onSubmit={handleSubmit}>
-        <div className="field">
-          <label>Name</label>
-          <input value={form.name} onChange={handleChange('name')} required />
-        </div>
-        <div className="field">
-          <label>Email</label>
-          <input type="email" value={form.email} onChange={handleChange('email')} required />
-        </div>
-        <div className="field">
-          <label>Phone</label>
-          <input value={form.phone} onChange={handleChange('phone')} required />
-        </div>
-        <div className="field">
-          <label>Address</label>
-          <input value={form.address} onChange={handleChange('address')} required />
-        </div>
-        <div className="row-actions">
-          <button type="submit" className="primary" disabled={loading}>
-            {loading ? 'Saving...' : editingId ? 'Update Customer' : 'Add Customer'}
-          </button>
-          {editingId && (
-            <button type="button" onClick={handleCancelEdit}>
-              Cancel
-            </button>
-          )}
-        </div>
-      </form>
+      {!canManage && (
+        <ViewOnly>You can view customers. Adding, editing or deleting them requires the {rolesFor('manageCustomers')} role.</ViewOnly>
+      )}
 
-      {customers.length === 0 ? (
-        <p className="empty">No customers yet.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>Address</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
+      {canManage && (
+        <Card title={editingId ? `Edit customer #${editingId}` : 'Add customer'}>
+          <FormGrid onSubmit={handleSubmit}>
+            <Field label="Name">
+              <input className={inputClass} value={form.name} onChange={handleChange('name')} required />
+            </Field>
+            <Field label="Email">
+              <input className={inputClass} type="email" value={form.email} onChange={handleChange('email')} required />
+            </Field>
+            <Field label="Phone">
+              <input className={inputClass} value={form.phone} onChange={handleChange('phone')} required />
+            </Field>
+            <Field label="Address">
+              <input className={inputClass} value={form.address} onChange={handleChange('address')} required />
+            </Field>
+            <FormActions>
+              <Button type="submit" variant="primary" disabled={loading}>
+                {loading ? 'Saving...' : editingId ? 'Update Customer' : 'Add Customer'}
+              </Button>
+              {editingId && <Button onClick={handleCancelEdit}>Cancel</Button>}
+            </FormActions>
+          </FormGrid>
+        </Card>
+      )}
+
+      <Card title={`All customers (${customers.length})`}>
+        {customers.length === 0 ? (
+          <Empty>No customers yet.</Empty>
+        ) : (
+          <Table columns={['ID', 'Name', 'Email', 'Phone', 'Address', ...(canManage ? [''] : [])]}>
             {customers.map((c) => (
-              <tr key={c.id}>
-                <td>{c.id}</td>
-                <td>{c.name}</td>
-                <td>{c.email}</td>
-                <td>{c.phone}</td>
-                <td>{c.address}</td>
-                <td>
-                  <div className="row-actions">
-                    <button onClick={() => handleEdit(c)}>Edit</button>
-                    <button onClick={() => handleDelete(c.id)}>Delete</button>
-                  </div>
-                </td>
+              <tr key={c.id} className={editingId === c.id ? 'bg-wash' : 'hover:bg-wash/60'}>
+                <Td className="text-muted">{c.id}</Td>
+                <Td className="font-bold">{c.name}</Td>
+                <Td>{c.email}</Td>
+                <Td>{c.phone}</Td>
+                <Td>{c.address}</Td>
+                {canManage && (
+                  <Td>
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" onClick={() => handleEdit(c)}>Edit</Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleDelete(c.id)}>Delete</Button>
+                    </div>
+                  </Td>
+                )}
               </tr>
             ))}
-          </tbody>
-        </table>
-      )}
+          </Table>
+        )}
+      </Card>
     </div>
   );
 }

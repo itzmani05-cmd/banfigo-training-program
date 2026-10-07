@@ -14,6 +14,12 @@ initAuth()
       </StrictMode>,
     )
   })
-  .catch(() => {
-    root.render(<p className="error">Could not connect to the login server. Is Keycloak running?</p>)
+  .catch((err) => {
+    console.error('Keycloak init failed', err)
+    root.render(
+      <div className="mx-auto mt-24 max-w-md rounded-lg border border-line bg-paper p-6 text-center shadow-sm">
+        <h2>Could not connect to the login server</h2>
+        <p className="mt-2 text-muted">Is Keycloak running? Check the browser console for details.</p>
+      </div>,
+    )
   })

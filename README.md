@@ -12,7 +12,8 @@ A simple banking backend (Spring Boot) with a React frontend, built for the Week
 
 **Frontend**
 - React 19 (Vite)
-- Plain `fetch` for API calls, no UI framework
+- Tailwind CSS v4
+- Plain `fetch` for API calls
 
 ## Project Structure
 

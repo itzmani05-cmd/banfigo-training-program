@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { BeneficiaryApi } from '../api';
+import { can } from '../permissions';
+import { Alert, Button, Card, Empty, Field, FormActions, FormGrid, PageHeader, Table, Td, inputClass } from './ui';
 
 const EMPTY_FORM = { name: '', accountNumber: '', bankName: '', ifscCode: '', customerId: '' };
 
 export default function BeneficiarySection() {
+  const canDelete = can('deleteBeneficiary');
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
@@ -51,66 +54,57 @@ export default function BeneficiarySection() {
 
   return (
     <div>
-      <h2>Beneficiaries</h2>
+      <PageHeader title="Beneficiaries" description="Saved payees a customer can send money to." />
 
-      {error && <div className="message">{error}</div>}
+      <Alert>{error}</Alert>
 
-      <form className="form-grid" onSubmit={handleSubmit}>
-        <div className="field">
-          <label>Name</label>
-          <input value={form.name} onChange={handleChange('name')} required />
-        </div>
-        <div className="field">
-          <label>Account Number</label>
-          <input value={form.accountNumber} onChange={handleChange('accountNumber')} required />
-        </div>
-        <div className="field">
-          <label>Bank Name</label>
-          <input value={form.bankName} onChange={handleChange('bankName')} required />
-        </div>
-        <div className="field">
-          <label>IFSC Code</label>
-          <input value={form.ifscCode} onChange={handleChange('ifscCode')} placeholder="ABCD0123456" required />
-        </div>
-        <div className="field">
-          <label>Customer ID</label>
-          <input type="number" value={form.customerId} onChange={handleChange('customerId')} required />
-        </div>
-        <button type="submit" className="primary" disabled={loading}>
-          {loading ? 'Adding...' : 'Add Beneficiary'}
-        </button>
-      </form>
+      <Card title="Add beneficiary">
+        <FormGrid onSubmit={handleSubmit}>
+          <Field label="Name">
+            <input className={inputClass} value={form.name} onChange={handleChange('name')} required />
+          </Field>
+          <Field label="Account Number">
+            <input className={inputClass} value={form.accountNumber} onChange={handleChange('accountNumber')} required />
+          </Field>
+          <Field label="Bank Name">
+            <input className={inputClass} value={form.bankName} onChange={handleChange('bankName')} required />
+          </Field>
+          <Field label="IFSC Code">
+            <input className={inputClass} value={form.ifscCode} onChange={handleChange('ifscCode')} placeholder="ABCD0123456" required />
+          </Field>
+          <Field label="Customer ID">
+            <input className={inputClass} type="number" value={form.customerId} onChange={handleChange('customerId')} required />
+          </Field>
+          <FormActions>
+            <Button type="submit" variant="primary" disabled={loading}>
+              {loading ? 'Adding...' : 'Add Beneficiary'}
+            </Button>
+          </FormActions>
+        </FormGrid>
+      </Card>
 
-      {beneficiaries.length === 0 ? (
-        <p className="empty">No beneficiaries yet.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Account Number</th>
-              <th>Bank</th>
-              <th>IFSC</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
+      <Card title={`All beneficiaries (${beneficiaries.length})`}>
+        {beneficiaries.length === 0 ? (
+          <Empty>No beneficiaries yet.</Empty>
+        ) : (
+          <Table columns={['ID', 'Name', 'Account Number', 'Bank', 'IFSC', ...(canDelete ? [''] : [])]}>
             {beneficiaries.map((b) => (
-              <tr key={b.id}>
-                <td>{b.id}</td>
-                <td>{b.name}</td>
-                <td>{b.accountNumber}</td>
-                <td>{b.bankName}</td>
-                <td>{b.ifscCode}</td>
-                <td>
-                  <button onClick={() => handleDelete(b.id)}>Delete</button>
-                </td>
+              <tr key={b.id} className="hover:bg-wash/60">
+                <Td className="text-muted">{b.id}</Td>
+                <Td className="font-bold">{b.name}</Td>
+                <Td className="tabular-nums">{b.accountNumber}</Td>
+                <Td>{b.bankName}</Td>
+                <Td className="tabular-nums">{b.ifscCode}</Td>
+                {canDelete && (
+                  <Td className="text-right">
+                    <Button size="sm" variant="ghost" onClick={() => handleDelete(b.id)}>Delete</Button>
+                  </Td>
+                )}
               </tr>
             ))}
-          </tbody>
-        </table>
-      )}
+          </Table>
+        )}
+      </Card>
     </div>
   );
 }

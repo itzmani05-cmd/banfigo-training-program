@@ -1,5 +1,10 @@
 import { useState } from 'react';
 import { TransactionApi } from '../api';
+import { money } from '../format';
+import { can, rolesFor } from '../permissions';
+import {
+  Alert, Button, Card, Empty, Field, FormActions, FormGrid, PageHeader, Table, Td, TransactionTypeBadge, ViewOnly, inputClass,
+} from './ui';
 
 const EMPTY_FORM = { transactionType: 'DEPOSIT', amount: '', description: '' };
 
@@ -49,68 +54,63 @@ export default function TransactionSection() {
 
   return (
     <div>
-      <div className="section-title">
-        <h2>Transactions</h2>
-      </div>
+      <PageHeader title="Transactions" description="Record deposits and withdrawals on an account." />
 
-      {error && <div className="message">{error}</div>}
+      <Alert>{error}</Alert>
 
-      <div className="field" style={{ maxWidth: 420, marginBottom: 16 }}>
-        <label>Account ID</label>
-        <div className="row-actions">
-          <input type="number" value={accountId} onChange={(e) => setAccountId(e.target.value)} />
-          <button onClick={load}>Load</button>
+      <Card title="Account">
+        <div className="flex max-w-md items-end gap-2">
+          <Field label="Account ID" className="flex-1">
+            <input className={inputClass} type="number" value={accountId} onChange={(e) => setAccountId(e.target.value)} />
+          </Field>
+          <Button onClick={load}>Load</Button>
         </div>
-      </div>
+      </Card>
 
-      <form className="form-grid" onSubmit={handleSubmit}>
-        <div className="field">
-          <label>Type</label>
-          <select value={form.transactionType} onChange={handleChange('transactionType')}>
-            <option value="DEPOSIT">DEPOSIT</option>
-            <option value="WITHDRAWAL">WITHDRAWAL</option>
-          </select>
-        </div>
-        <div className="field">
-          <label>Amount</label>
-          <input type="number" min="1" value={form.amount} onChange={handleChange('amount')} required />
-        </div>
-        <div className="field">
-          <label>Description</label>
-          <input value={form.description} onChange={handleChange('description')} />
-        </div>
-        <button type="submit" className="primary" disabled={loading}>
-          {loading ? 'Submitting...' : 'Submit Transaction'}
-        </button>
-      </form>
+      {can('createTransaction') ? (
+        <Card title="New transaction">
+          <FormGrid onSubmit={handleSubmit}>
+            <Field label="Type">
+              <select className={inputClass} value={form.transactionType} onChange={handleChange('transactionType')}>
+                <option value="DEPOSIT">DEPOSIT</option>
+                <option value="WITHDRAWAL">WITHDRAWAL</option>
+              </select>
+            </Field>
+            <Field label="Amount">
+              <input className={inputClass} type="number" min="1" value={form.amount} onChange={handleChange('amount')} required />
+            </Field>
+            <Field label="Description" className="sm:col-span-2">
+              <input className={inputClass} value={form.description} onChange={handleChange('description')} />
+            </Field>
+            <FormActions>
+              <Button type="submit" variant="primary" disabled={loading}>
+                {loading ? 'Submitting...' : 'Submit Transaction'}
+              </Button>
+            </FormActions>
+          </FormGrid>
+        </Card>
+      ) : (
+        <ViewOnly>You can view transactions. Recording deposits or withdrawals requires the {rolesFor('createTransaction')} role.</ViewOnly>
+      )}
 
       {loaded && (
-        transactions.length === 0 ? (
-          <p className="empty">No transactions for this account.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Type</th>
-                <th>Amount</th>
-                <th>Description</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
+        <Card title={`Transactions for account ${accountId}`}>
+          {transactions.length === 0 ? (
+            <Empty>No transactions for this account.</Empty>
+          ) : (
+            <Table columns={['ID', 'Type', 'Description', 'Date', '>Amount']}>
               {transactions.map((t) => (
-                <tr key={t.id}>
-                  <td>{t.id}</td>
-                  <td>{t.transactionType}</td>
-                  <td>{t.amount}</td>
-                  <td>{t.description}</td>
-                  <td>{t.transactionDate}</td>
+                <tr key={t.id} className="hover:bg-wash/60">
+                  <Td className="text-muted">{t.id}</Td>
+                  <Td><TransactionTypeBadge type={t.transactionType} /></Td>
+                  <Td>{t.description || '-'}</Td>
+                  <Td className="whitespace-nowrap text-muted">{t.transactionDate.replace('T', ' ').slice(0, 16)}</Td>
+                  <Td className="text-right font-bold tabular-nums">{money(t.amount)}</Td>
                 </tr>
               ))}
-            </tbody>
-          </table>
-        )
+            </Table>
+          )}
+        </Card>
       )}
     </div>
   );

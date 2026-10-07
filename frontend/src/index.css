@@ -1,87 +1,54 @@
-* {
-  box-sizing: border-box;
+@import "tailwindcss";
+
+/*
+  Design tokens: blue, white and black. Tailwind turns each token into utilities,
+  e.g. --color-brand -> bg-brand / text-brand / border-brand, --text-body -> text-body.
+  "static" keeps every token as a CSS variable even when no class uses it,
+  because the chart reads some of them with var().
+*/
+@theme static {
+  --font-sans: Arial, Helvetica, sans-serif;
+
+  /* Core palette */
+  --color-ink: #000000;         /* text, sidebar */
+  --color-paper: #ffffff;       /* cards, inputs */
+  --color-brand: #1d4ed8;       /* primary actions, highlights */
+  --color-brand-dark: #1e3a8a;  /* hover / pressed */
+  --color-brand-soft: #eff4ff;  /* tinted backgrounds */
+
+  /* Neutrals (cool greys that sit well with the blue) */
+  --color-muted: #4b5563;       /* secondary text */
+  --color-subtle: #6b7280;      /* captions, axis labels */
+  --color-line: #e2e8f0;        /* borders, grid lines */
+  --color-axis: #94a3b8;        /* chart baseline */
+  --color-wash: #f5f7fb;        /* page background, table header */
+
+  /* Chart series: blue vs black stay distinct for color-blind users and in greyscale */
+  --color-series-in: #1d4ed8;
+  --color-series-out: #000000;
+
+  --text-caption: 12px;
+  --text-label: 13px;
+  --text-body: 14px;
+  --text-title: 22px;
+  --text-stat: 28px;
 }
 
-html, body {
-  margin: 0;
-  padding: 0;
-  background: #ffffff;
-  color: #000000;
-  font-family: Arial, Helvetica, sans-serif;
-}
+@layer base {
+  html,
+  body {
+    @apply bg-wash font-sans text-body text-ink antialiased;
+  }
 
-#root {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 24px 16px 64px;
-}
+  h2 {
+    @apply text-title font-bold tracking-tight;
+  }
 
-button {
-  font-family: inherit;
-  font-size: 14px;
-  padding: 8px 16px;
-  background: #ffffff;
-  color: #000000;
-  border: 2px solid #000000;
-  cursor: pointer;
-}
+  h3 {
+    @apply text-body font-bold;
+  }
 
-button:hover {
-  background: #000000;
-  color: #ffffff;
-}
-
-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-button.active,
-button.primary {
-  background: #000000;
-  color: #ffffff;
-}
-
-button.active:hover,
-button.primary:hover {
-  background: #ffffff;
-  color: #000000;
-}
-
-input, select, textarea {
-  font-family: inherit;
-  font-size: 14px;
-  padding: 8px;
-  border: 1px solid #000000;
-  background: #ffffff;
-  color: #000000;
-  width: 100%;
-}
-
-input:focus, select:focus, textarea:focus {
-  outline: 2px solid #000000;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 12px;
-}
-
-th, td {
-  border: 1px solid #000000;
-  padding: 8px;
-  text-align: left;
-  font-size: 14px;
-}
-
-th {
-  background: #000000;
-  color: #ffffff;
-}
-
-hr {
-  border: none;
-  border-top: 1px solid #000000;
-  margin: 24px 0;
+  ::selection {
+    @apply bg-brand text-paper;
+  }
 }

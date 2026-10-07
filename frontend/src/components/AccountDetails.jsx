@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import { AccountApi, StatementApi, TransactionApi } from '../api';
+import { money } from '../format';
+import {
+  Alert, Button, Card, DetailList, Empty, Field, FormActions, FormGrid, PageHeader, Table, Td, TransactionTypeBadge, inputClass,
+} from './ui';
 
 const PAGE_SIZE = 10;
 const EMPTY_FILTERS = { from: '', to: '', type: '' };
@@ -88,147 +92,110 @@ export default function AccountDetails({ accountId, onBack }) {
     setPage(0);
   };
 
+  const statementDisabled = !statementRange.from || !statementRange.to || downloading !== '';
+
   return (
     <div>
-      <div className="section-title">
-        <h2>Account Details</h2>
-        <button onClick={onBack}>Back to Accounts</button>
-      </div>
+      <PageHeader title="Account Details">
+        <Button icon="back" onClick={onBack}>Back to Accounts</Button>
+      </PageHeader>
 
-      {error && <div className="message">{error}</div>}
+      <Alert>{error}</Alert>
 
       {loading ? (
-        <p className="empty">Loading...</p>
+        <Empty>Loading...</Empty>
       ) : account && (
         <>
-          <table>
-            <tbody>
-              <tr>
-                <th>ID</th>
-                <td>{account.id}</td>
-              </tr>
-              <tr>
-                <th>Account Number</th>
-                <td>{account.accountNumber}</td>
-              </tr>
-              <tr>
-                <th>Type</th>
-                <td>{account.accountType}</td>
-              </tr>
-              <tr>
-                <th>Balance</th>
-                <td>{account.balance}</td>
-              </tr>
-              <tr>
-                <th>Customer</th>
-                <td>
-                  {account.customerName
-                    ? `${account.customerName} (ID ${account.customerId})`
-                    : `ID ${account.customerId}`}
-                </td>
-              </tr>
-              <tr>
-                <th>Customer Email</th>
-                <td>{account.customerEmail || '-'}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <hr />
-
-          <h3>Download Statement</h3>
-
-          <div className="form-grid">
-            <div className="field">
-              <label>From</label>
-              <input type="date" value={statementRange.from} onChange={handleStatementChange('from')} />
+          <Card>
+            <div className="-mx-4 -mt-4 mb-6 flex flex-col gap-4 bg-brand px-4 py-6 text-paper sm:-mx-6 sm:-mt-6 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+              <div className="min-w-0">
+                <div className="text-label text-paper/75">{account.accountType} account</div>
+                <div className="mt-1 text-title font-bold tracking-wider tabular-nums">{account.accountNumber}</div>
+              </div>
+              <div className="sm:text-right">
+                <div className="text-label text-paper/75">Available balance</div>
+                <div className="mt-1 text-stat font-bold tabular-nums">{money(account.balance)}</div>
+              </div>
             </div>
-            <div className="field">
-              <label>To</label>
-              <input type="date" value={statementRange.to} onChange={handleStatementChange('to')} />
-            </div>
-            <div className="row-actions">
-              <button
-                className="primary"
-                onClick={() => downloadStatement('pdf')}
-                disabled={!statementRange.from || !statementRange.to || downloading !== ''}
-              >
-                {downloading === 'pdf' ? 'Preparing...' : 'Download PDF'}
-              </button>
-              <button
-                onClick={() => downloadStatement('csv')}
-                disabled={!statementRange.from || !statementRange.to || downloading !== ''}
-              >
-                {downloading === 'csv' ? 'Preparing...' : 'Download CSV'}
-              </button>
-            </div>
-          </div>
+            <DetailList
+              items={[
+                ['Account ID', account.id],
+                ['Customer', account.customerName ? `${account.customerName} (ID ${account.customerId})` : `ID ${account.customerId}`],
+                ['Customer Email', account.customerEmail || '-'],
+              ]}
+            />
+          </Card>
 
-          <hr />
+          <Card title="Download Statement" subtitle="Opening and closing balance with every transaction in the period">
+            <FormGrid>
+              <Field label="From">
+                <input className={inputClass} type="date" value={statementRange.from} onChange={handleStatementChange('from')} />
+              </Field>
+              <Field label="To">
+                <input className={inputClass} type="date" value={statementRange.to} onChange={handleStatementChange('to')} />
+              </Field>
+              <FormActions>
+                <Button variant="primary" icon="download" onClick={() => downloadStatement('pdf')} disabled={statementDisabled}>
+                  {downloading === 'pdf' ? 'Preparing...' : 'Download PDF'}
+                </Button>
+                <Button icon="download" onClick={() => downloadStatement('csv')} disabled={statementDisabled}>
+                  {downloading === 'csv' ? 'Preparing...' : 'Download CSV'}
+                </Button>
+              </FormActions>
+            </FormGrid>
+          </Card>
 
-          <h3>Transaction History</h3>
+          <Card title="Transaction History">
+            <form onSubmit={applyFilters} className="mb-5 grid gap-4 sm:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+              <Field label="From">
+                <input className={inputClass} type="date" value={draftFilters.from} onChange={handleFilterChange('from')} />
+              </Field>
+              <Field label="To">
+                <input className={inputClass} type="date" value={draftFilters.to} onChange={handleFilterChange('to')} />
+              </Field>
+              <Field label="Type">
+                <select className={inputClass} value={draftFilters.type} onChange={handleFilterChange('type')}>
+                  <option value="">All</option>
+                  <option value="DEPOSIT">DEPOSIT</option>
+                  <option value="WITHDRAWAL">WITHDRAWAL</option>
+                </select>
+              </Field>
+              <div className="flex gap-2 sm:col-span-3 lg:col-span-1">
+                <Button type="submit" variant="primary">Apply</Button>
+                <Button onClick={clearFilters}>Clear</Button>
+              </div>
+            </form>
 
-          <form className="form-grid" onSubmit={applyFilters}>
-            <div className="field">
-              <label>From</label>
-              <input type="date" value={draftFilters.from} onChange={handleFilterChange('from')} />
-            </div>
-            <div className="field">
-              <label>To</label>
-              <input type="date" value={draftFilters.to} onChange={handleFilterChange('to')} />
-            </div>
-            <div className="field">
-              <label>Type</label>
-              <select value={draftFilters.type} onChange={handleFilterChange('type')}>
-                <option value="">All</option>
-                <option value="DEPOSIT">DEPOSIT</option>
-                <option value="WITHDRAWAL">WITHDRAWAL</option>
-              </select>
-            </div>
-            <div className="row-actions">
-              <button type="submit" className="primary">Apply</button>
-              <button type="button" onClick={clearFilters}>Clear</button>
-            </div>
-          </form>
-
-          {txLoading ? (
-            <p className="empty">Loading transactions...</p>
-          ) : transactions.length === 0 ? (
-            <p className="empty">No transactions found.</p>
-          ) : (
-            <>
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Type</th>
-                    <th>Amount</th>
-                    <th>Description</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
-                <tbody>
+            {txLoading ? (
+              <Empty>Loading transactions...</Empty>
+            ) : transactions.length === 0 ? (
+              <Empty>No transactions found.</Empty>
+            ) : (
+              <>
+                <Table columns={['ID', 'Type', 'Description', 'Date', '>Amount']}>
                   {transactions.map((t) => (
-                    <tr key={t.id}>
-                      <td>{t.id}</td>
-                      <td>{t.transactionType}</td>
-                      <td>{t.amount}</td>
-                      <td>{t.description}</td>
-                      <td>{t.transactionDate}</td>
+                    <tr key={t.id} className="hover:bg-wash/60">
+                      <Td className="text-muted">{t.id}</Td>
+                      <Td><TransactionTypeBadge type={t.transactionType} /></Td>
+                      <Td>{t.description || '-'}</Td>
+                      <Td className="whitespace-nowrap text-muted">{t.transactionDate.replace('T', ' ').slice(0, 16)}</Td>
+                      <Td className="text-right font-bold tabular-nums">{money(t.amount)}</Td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
+                </Table>
 
-              <div className="row-actions" style={{ marginTop: 12, alignItems: 'center' }}>
-                <button onClick={() => setPage(page - 1)} disabled={page === 0}>Previous</button>
-                <span>
-                  Page {pageInfo.page + 1} of {pageInfo.totalPages} ({pageInfo.totalElements} total)
-                </span>
-                <button onClick={() => setPage(page + 1)} disabled={page + 1 >= pageInfo.totalPages}>Next</button>
-              </div>
-            </>
-          )}
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-label text-muted">
+                    Page {pageInfo.page + 1} of {pageInfo.totalPages} · {pageInfo.totalElements} transactions
+                  </span>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => setPage(page - 1)} disabled={page === 0}>Previous</Button>
+                    <Button size="sm" onClick={() => setPage(page + 1)} disabled={page + 1 >= pageInfo.totalPages}>Next</Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </Card>
         </>
       )}
     </div>

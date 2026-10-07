@@ -56,7 +56,9 @@ Create the client once in the Keycloak admin console (realm `Banfigo`):
 4. **Valid post logout redirect URIs**: `http://localhost:5173/*`
 5. **Web origins**: `http://localhost:5173`
 
-Users need realm roles for anything beyond viewing: `ADMIN` (create accounts, create/edit/delete customers, delete beneficiaries), `MAKER` (create transactions), `CHECKER` (delete beneficiaries).
+Users need realm roles for anything beyond viewing: `ADMIN` (create accounts, create/edit/delete customers, delete beneficiaries, approve/reject/revoke consents), `MAKER` (create transactions, request consents), `CHECKER` (delete beneficiaries, approve/reject/revoke consents).
+
+To try the consent flow, log in as a `MAKER` user to raise a request on the **Consents** tab, then log in as a different `CHECKER` or `ADMIN` user to approve or reject it. The same user can't do both.
 
 ## Pages
 

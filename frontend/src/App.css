@@ -175,3 +175,21 @@ details summary {
   font-size: 13px;
   margin-top: 8px;
 }
+
+fieldset.field {
+  border: 1px solid #000000;
+  padding: 8px 12px;
+  margin: 0;
+}
+
+fieldset.field legend {
+  font-weight: bold;
+  padding: 0 4px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}

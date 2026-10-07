@@ -146,6 +146,44 @@ Includes the opening balance, every transaction with a running balance, total de
 | GET | `/` | List all beneficiaries |
 | DELETE | `/{id}` | Remove a beneficiary |
 
+### Consents — `/api/consents`
+Open Banking style consents: a customer lets a third-party provider (TPP) access some of their accounts. Requests follow a maker-checker flow.
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| POST | `/` | `MAKER` | Create a consent request (status `AWAITING_AUTHORISATION`) |
+| GET | `/?status=AUTHORISED` | any logged-in user | List consents, newest first (`status` is optional) |
+| GET | `/{id}` | any logged-in user | Get a consent by id |
+| POST | `/{id}/approve` | `CHECKER` or `ADMIN` | Approve a pending consent (status `AUTHORISED`) |
+| POST | `/{id}/reject` | `CHECKER` or `ADMIN` | Reject a pending consent, optional body `{ "reason": "..." }` |
+| POST | `/{id}/revoke` | `CHECKER` or `ADMIN` | Withdraw an authorised consent, optional body `{ "reason": "..." }` |
+
+Request body for create:
+
+```json
+{
+  "customerId": 1,
+  "tppName": "Budget App Ltd",
+  "permissions": ["READ_ACCOUNTS", "READ_BALANCES", "READ_TRANSACTIONS"],
+  "accountIds": [1, 2],
+  "expiresAt": "2027-01-31T23:59:00"
+}
+```
+
+Permissions: `READ_ACCOUNTS`, `READ_BALANCES`, `READ_TRANSACTIONS`, `READ_BENEFICIARIES`.
+
+Rules:
+- Every account in `accountIds` must belong to the customer.
+- The user who created a consent can't approve or reject it. Another user has to do that (four-eyes check).
+- Only `AWAITING_AUTHORISATION` consents can be approved or rejected, and only `AUTHORISED` ones can be revoked. Any other transition returns `409 Conflict`.
+- Pending or authorised consents whose `expiresAt` has passed are marked `EXPIRED` automatically.
+
+```
+AWAITING_AUTHORISATION ──approve──▶ AUTHORISED ──revoke──▶ REVOKED
+          │                              │
+          └──reject──▶ REJECTED          └── (expiry passes) ──▶ EXPIRED
+```
+
 ## Notes
 
 - Validation errors and "not found" errors return a consistent JSON error shape (see `GlobalExceptionHandler`).

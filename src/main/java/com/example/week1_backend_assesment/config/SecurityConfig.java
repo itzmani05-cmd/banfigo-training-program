@@ -73,6 +73,25 @@ public class SecurityConfig {
                                 "/api/beneficiaries/**"
                         ).authenticated()
 
+                        // Consents: MAKER raises a request, CHECKER / ADMIN decides on it
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/consents"
+                        ).hasRole("MAKER")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/consents/*/approve",
+                                "/api/consents/*/reject",
+                                "/api/consents/*/revoke"
+                        ).hasAnyRole("ADMIN", "CHECKER")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.GET,
+                                "/api/consents",
+                                "/api/consents/**"
+                        ).authenticated()
+
                         // Customers
                         .requestMatchers(
                                 org.springframework.http.HttpMethod.GET,

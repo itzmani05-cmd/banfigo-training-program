@@ -6,6 +6,7 @@ import AccountSection from './components/AccountSection';
 import BeneficiarySection from './components/BeneficiarySection';
 import TransactionSection from './components/TransactionSection';
 import TransferSection from './components/TransferSection';
+import ConsentSection from './components/ConsentSection';
 import { getUser, logout } from './auth';
 
 const TABS = [
@@ -15,6 +16,7 @@ const TABS = [
   { key: 'transactions', label: 'Transactions', component: TransactionSection },
   { key: 'transfers', label: 'Transfers', component: TransferSection },
   { key: 'beneficiaries', label: 'Beneficiaries', component: BeneficiarySection },
+  { key: 'consents', label: 'Consents', component: ConsentSection },
 ];
 
 function App() {

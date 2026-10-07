@@ -81,6 +81,15 @@ export const DashboardApi = {
   get: () => request('/dashboard'),
 };
 
+export const ConsentApi = {
+  // status: optional ConsentStatus filter, e.g. 'AWAITING_AUTHORISATION'
+  list: (status) => request(`/consents${toQuery({ status })}`),
+  create: (data) => request('/consents', { method: 'POST', body: JSON.stringify(data) }),
+  approve: (id) => request(`/consents/${id}/approve`, { method: 'POST' }),
+  reject: (id, reason) => request(`/consents/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  revoke: (id, reason) => request(`/consents/${id}/revoke`, { method: 'POST', body: JSON.stringify({ reason }) }),
+};
+
 export const TransferApi = {
   create: (data) => request('/transfers', { method: 'POST', body: JSON.stringify(data) }),
 };

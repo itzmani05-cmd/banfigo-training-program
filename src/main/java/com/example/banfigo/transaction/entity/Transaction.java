@@ -31,6 +31,10 @@ public class Transaction {
     @Column(length = 36)
     private String reference;
 
+    // Login name of whoever made the deposit, withdrawal or transfer; null for rows from before this was recorded
+    @Column(name = "created_by", length = 100)
+    private String createdBy;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private BankAccount account;
@@ -98,6 +102,14 @@ public class Transaction {
 
     public void setReference(String reference) {
         this.reference = reference;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
     }
 
     public BankAccount getAccount() {

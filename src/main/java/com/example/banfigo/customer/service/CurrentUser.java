@@ -41,6 +41,19 @@ public class CurrentUser {
         return scope == null || scope.equals(owner.getId());
     }
 
+    // Login name for audit columns: Keycloak's preferred_username, falling back to the subject id
+    public String username() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            return null;
+        }
+        if (auth.getPrincipal() instanceof Jwt jwt) {
+            String username = jwt.getClaimAsString("preferred_username");
+            return username != null ? username : jwt.getSubject();
+        }
+        return auth.getName();
+    }
+
     // The Customer record linked to the caller's login, created on first use
     public Customer customer() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

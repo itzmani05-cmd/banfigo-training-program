@@ -4,7 +4,7 @@ This folder contains everything needed to test the whole API:
 
 | File | What it is |
 |---|---|
-| `banfigo.postman_collection.json` | 45 requests in 12 folders, with automatic tokens and pass/fail tests |
+| `banfigo.postman_collection.json` | 70 requests in 13 folders, with automatic tokens and pass/fail tests |
 | `banfigo-local.postman_environment.json` | Settings for running locally (backend `:8082`, Keycloak `:8086`) |
 | `banfigo-docker.postman_environment.json` | Settings for Docker Compose (everything through Nginx at `:8080`) |
 
@@ -45,10 +45,16 @@ For your own Keycloak on port 8086, check in the admin console (http://localhost
    | `admin1` | `admin123` | ADMIN |
    | `maker1` | `maker123` | MAKER |
    | `checker1` | `checker123` | CHECKER |
+   | `customer1` | `customer123` | CUSTOMER |
 
    For each user: **Credentials → Set password** with *Temporary* **off**, and **Role mapping → Assign role** (filter by realm roles).
 
 Tip: the easiest way to get exactly this setup is to import `keycloak/realm-export.json` (**Create realm → Browse → select the file**). If a `BanfigoNew` realm already exists, delete it first.
+
+**Docker users with an older Keycloak volume:** the realm is only imported on Keycloak's first start, so `customer1` and the
+`CUSTOMER` role won't exist if your `keycloak_data` volume is older than them. Either recreate it
+(`docker compose down`, `docker volume rm banfigo_keycloak_data`, `docker compose up -d`) or add the role and user by hand.
+Without `customer1`, only folder 11 fails.
 
 ---
 
@@ -64,7 +70,8 @@ Tip: the easiest way to get exactly this setup is to import `keycloak/realm-expo
 
 1. Top right, open the environment dropdown and choose **Banfigo – Local** or **Banfigo – Docker** (matching Step 1).
 2. Optional: click the eye icon to check the values. If your users or passwords differ, edit
-   `adminUser`, `adminPassword`, `makerUser`, `makerPassword`, `checkerUser`, `checkerPassword` and **Save**.
+   `adminUser`, `adminPassword`, `makerUser`, `makerPassword`, `checkerUser`, `checkerPassword`,
+   `customerUser`, `customerPassword` and **Save**.
 
 | Variable | Local | Docker |
 |---|---|---|
@@ -84,8 +91,8 @@ Tip: the easiest way to get exactly this setup is to import `keycloak/realm-expo
    - `realm_access.roles` → contains `MAKER`
    - `exp` → the token is valid for 5 minutes
 
-You never need to copy tokens into requests: the collection's pre-request script logs in as admin1, maker1 and checker1
-automatically and renews the tokens before they expire. Each request already says which user it runs as (Authorization tab).
+You never need to copy tokens into requests: the collection's pre-request script logs in as admin1, maker1, checker1 and
+customer1 automatically and renews the tokens before they expire. Each request already says which user it runs as (Authorization tab).
 
 If this step fails, see [Troubleshooting](#troubleshooting).
 
@@ -101,14 +108,15 @@ Click a request → **Send** → check the status code and the **Test Results** 
 | **1. Health & Info** | no token | Health check and app info | 200 |
 | **2. Customers** | admin1 (writes), maker1 (reads) | Create customers A and B, list, get, update | 201, 201, 200, 200, 200 |
 | **3. Accounts** | admin1 (writes), checker1 (reads) | Open account A (customer A) and B (customer B), list, get | 201, 201, 200, 200 |
-| **4. Transactions** | maker1 | Deposit 5000, withdraw 500, try to overdraw, history with paging/filter | 201, 201, **400**, 200, 200 |
+| **4. Transactions** | maker1 | Deposit 5000 (checks `createdBy`), withdraw 500, try to overdraw, 3 decimal places, history with paging/filter | 201, 201, **400**, **400**, 200, 200 |
 | **5. Beneficiaries** | maker1 | Add a beneficiary for customer A, list | 201, 200 |
-| **6. Transfers** | maker1 | A → B 250, pay beneficiary 100 | 201, 201 |
+| **6. Transfers** | maker1 | A → B 250, pay beneficiary 100, over the limit, `Idempotency-Key` (send, repeat, check balance, reuse for another amount) | 201, 201, **400**, 201, 201, 200, **409** |
 | **7. Statements** | maker1 | This month's statement as CSV and PDF | 200, 200 |
 | **8. Dashboard** | checker1 | Totals, recent transactions, monthly flows | 200 |
 | **9. Consents** | maker1 requests, checker1 decides | Request → maker can't approve (**403**) → checker approves → second consent rejected → approving it again fails (**409**) → first consent revoked | 201, 200, 200, **403**, 200, 201, 200, **409**, 200 |
 | **10. Security & error checks** | various | 401 vs 403, validation, malformed JSON, wrong id type, not found, delete blocked | see below |
-| **11. Cleanup** | checker1 | Delete the beneficiary | 204 |
+| **11. Customer self-service** | customer1 (admin1 / maker1 set up the account) | A customer sees and moves only their own money | see below |
+| **12. Cleanup** | checker1 | Delete the beneficiary | 204 |
 
 Statements: to see the file, use **Save response → Save to a file** (PDF) or look at the body (CSV).
 
@@ -130,14 +138,46 @@ Statements: to see the file, use **Save response → Save to a file** (PDF) or l
 
 **Rule of thumb:** 401 = *who are you?* (missing/invalid token). 403 = *I know who you are, but you're not allowed* (wrong role).
 
+### Folder 6 explained — safe retries with `Idempotency-Key`
+
+| Request | Expected | Why |
+|---|---|---|
+| Transfer over the limit | **400** | More than 100,000 in one transfer (`banfigo.limits.max-transaction-amount`) |
+| Transfer 10 with Idempotency-Key | **201** | Sends a fresh key (`{{$guid}}`) and saves the reference and balance |
+| Repeat same key | **201**, same `reference` | Like a network retry: the API returns the first result and doesn't debit again |
+| Balance of A moved only once | **200** | The balance equals the one after the first request |
+| Same key, different amount | **409** | A key belongs to one transfer |
+
+### Folder 11 explained — a self-registered customer
+
+First `GET /api/me` creates or finds customer1's customer record. Then admin1 opens an account for them and maker1 deposits 1000.
+
+| Request | Expected | Why |
+|---|---|---|
+| Customer: my profile | **200** | Saves `myCustomerId` |
+| Staff calling /api/me | **403** | Only for CUSTOMER logins |
+| Customer: my accounts only | **200** | Every account returned belongs to customer1 |
+| Someone else's account / transactions | **404** | Other customers' records look like missing ones |
+| Customer: list all customers | **403** | The customer list is for staff |
+| Customer: deposit | **403** | Only MAKER records deposits and withdrawals |
+| Add / list beneficiaries | **201**, **200** | No `customerId` needed; only their own are listed |
+| Pay my beneficiary 100 | **201** | Beneficiary is account B in this bank, so B is credited |
+| Pay from someone else's account | **404** | Customers pay from their own accounts |
+| Transfer straight to another customer | **404** | Others are paid through a saved beneficiary |
+| Use another customer's beneficiary | **404** | Beneficiaries are private |
+| My dashboard / consents | **200** | Only customer1's figures and consents |
+| Delete my beneficiary | **204** | Customers manage their own list |
+
 ---
 
 ## Step 7 — Run everything at once (Collection Runner)
 
 1. Right-click the **Banfigo API** collection → **Run collection**.
 2. Keep all requests ticked, in order. Iterations: **1**.
-3. Click **Run Banfigo API**.
-4. Expected: every test passes (green). You can run it again any time — account numbers are generated fresh on every run.
+3. **Docker only:** set **Delay** to **250 ms**. The Nginx gateway allows 5 writes per second per client and answers `429`
+   above that, and the runner is faster than that without a delay.
+4. Click **Run Banfigo API**.
+5. Expected: every test passes (green). You can run it again any time — account numbers are generated fresh on every run.
 
 Save a screenshot of the result for your submission.
 
@@ -145,15 +185,20 @@ Save a screenshot of the result for your submission.
 
 ## Who can do what (role rules from `SecurityConfig.java`)
 
+CUSTOMER can only see and change its own records. Someone else's record answers `404`.
+
 | Action | Needs |
 |---|---|
 | `GET /health`, `GET /api/info` | nothing (public) |
-| Any other `GET` | any valid token |
+| `GET /api/me` | CUSTOMER |
+| List / view customers | ADMIN, MAKER or CHECKER |
 | Create / update / delete customers | ADMIN |
+| View accounts, transactions, statements, beneficiaries, consents, dashboard | any role (CUSTOMER: own only) |
 | Open accounts | ADMIN |
-| Deposits / withdrawals, transfers | MAKER |
-| Add beneficiaries | any valid token |
-| Delete beneficiaries | ADMIN or CHECKER |
+| Deposits / withdrawals | MAKER |
+| Transfers | MAKER, or CUSTOMER from their own account |
+| Add beneficiaries | any role (CUSTOMER: for themselves) |
+| Delete beneficiaries | ADMIN, CHECKER, or CUSTOMER (own) |
 | Request a consent | MAKER |
 | Approve / reject / revoke a consent | ADMIN or CHECKER (and not the user who requested it) |
 
@@ -171,5 +216,7 @@ Save a screenshot of the result for your submission.
 | `{{customerId}}` / `{{accountId}}` errors, or 404s on later folders | An earlier request didn't run or failed. Run the folders in order from folder 2. |
 | *Could not send request* / connection refused | The backend (or Nginx for Docker) isn't running — repeat Step 1's check. |
 | `Withdraw too much` returns 201 | Deposit amounts were changed; it only fails when the amount is above the balance. |
+| *Could not get a token for customer* / folder 11 fails with 401 | `customer1` doesn't exist in your Keycloak. Re-import the realm (Step 2). |
+| Random **429 Too Many Requests** in the runner | The Docker gateway's rate limit. Set the runner's **Delay** to 250 ms (Step 7). |
 
 To see what the token script did: **View → Show Postman Console** (bottom left).

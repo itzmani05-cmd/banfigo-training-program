@@ -79,6 +79,7 @@ public class TransactionService {
         transaction.setDescription(request.getDescription());
         transaction.setTransactionDate(LocalDateTime.now());
         transaction.setAccount(account);
+        transaction.setCreatedBy(currentUser.username());
 
         return mapToResponse(transactionRepository.save(transaction));
     }
@@ -139,7 +140,8 @@ public class TransactionService {
                 t.getTransactionDate(),
                 // Reading the id of a lazy proxy doesn't trigger a database load
                 t.getAccount().getId(),
-                t.getReference()
+                t.getReference(),
+                t.getCreatedBy()
         );
     }
 }

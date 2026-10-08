@@ -12,11 +12,14 @@ import com.example.banfigo.transaction.repository.TransactionRepository;
 import com.example.banfigo.transaction.service.TransactionLimitPolicy;
 import com.example.banfigo.transfer.dto.TransferRequest;
 import com.example.banfigo.transfer.dto.TransferResponse;
+import com.example.banfigo.transfer.entity.TransferRecord;
+import com.example.banfigo.transfer.repository.TransferRecordRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,6 +32,7 @@ public class TransferService {
     private final BankAccountRepository bankAccountRepository;
     private final TransactionRepository transactionRepository;
     private final BeneficiaryRepository beneficiaryRepository;
+    private final TransferRecordRepository transferRecordRepository;
     private final TransactionLimitPolicy limitPolicy;
     private final CurrentUser currentUser;
 
@@ -36,20 +40,30 @@ public class TransferService {
             BankAccountRepository bankAccountRepository,
             TransactionRepository transactionRepository,
             BeneficiaryRepository beneficiaryRepository,
+            TransferRecordRepository transferRecordRepository,
             TransactionLimitPolicy limitPolicy,
             CurrentUser currentUser) {
 
         this.bankAccountRepository = bankAccountRepository;
         this.transactionRepository = transactionRepository;
         this.beneficiaryRepository = beneficiaryRepository;
+        this.transferRecordRepository = transferRecordRepository;
         this.limitPolicy = limitPolicy;
         this.currentUser = currentUser;
     }
 
-    // Debit and credit happen in one database transaction: if anything fails,
-    // neither balance changes and no transaction rows are written.
     @Transactional
     public TransferResponse transfer(TransferRequest request) {
+        return transfer(request, null);
+    }
+
+    // Debit and credit happen in one database transaction: if anything fails,
+    // neither balance changes and no transaction rows are written.
+    //
+    // idempotencyKey (optional, from the Idempotency-Key header): a repeat of the same request with
+    // the same key returns the first result instead of moving the money again.
+    @Transactional
+    public TransferResponse transfer(TransferRequest request, String idempotencyKey) {
 
         boolean toAccount = request.getToAccountId() != null;
         boolean toBeneficiary = request.getBeneficiaryId() != null;
@@ -62,9 +76,78 @@ public class TransferService {
 
         limitPolicy.check(request.getAmount());
 
-        return toAccount
+        if (idempotencyKey == null) {
+            return execute(request);
+        }
+
+        Optional<TransferRecord> previous = transferRecordRepository.findById(idempotencyKey);
+        if (previous.isPresent()) {
+            return replay(previous.get(), request);
+        }
+
+        // Claim the key before any money moves. A parallel request with the same key waits on this
+        // insert until we commit, then fails on the primary key (handled by replayAfterConflict).
+        // If the transfer fails, the claim is rolled back with it and the key can be retried.
+        // The key is a preset id, so this is a merge: use the managed copy it returns
+        TransferRecord record = transferRecordRepository.saveAndFlush(newRecord(idempotencyKey, request));
+
+        TransferResponse response = execute(request);
+        fillResult(record, response);
+        return response;
+    }
+
+    // For the losing side of two simultaneous requests with the same key
+    @Transactional(readOnly = true)
+    public Optional<TransferResponse> replayAfterConflict(String idempotencyKey, TransferRequest request) {
+        return transferRecordRepository.findById(idempotencyKey).map(record -> replay(record, request));
+    }
+
+    private TransferResponse execute(TransferRequest request) {
+        return request.getToAccountId() != null
                 ? transferBetweenAccounts(request, request.getToAccountId(), null)
                 : transferToBeneficiary(request);
+    }
+
+    private TransferRecord newRecord(String idempotencyKey, TransferRequest request) {
+        TransferRecord record = new TransferRecord();
+        record.setIdempotencyKey(idempotencyKey);
+        record.setUsername(currentUser.username());
+        record.setCreatedAt(LocalDateTime.now());
+        record.setFromAccountId(request.getFromAccountId());
+        record.setToAccountId(request.getToAccountId());
+        record.setBeneficiaryId(request.getBeneficiaryId());
+        record.setAmount(request.getAmount());
+        return record;
+    }
+
+    // Saved when the transaction commits, since the record is managed
+    private static void fillResult(TransferRecord record, TransferResponse response) {
+        record.setReference(response.getReference());
+        record.setResultToAccountId(response.getToAccountId());
+        record.setToAccountNumber(response.getToAccountNumber());
+        record.setBeneficiaryName(response.getBeneficiaryName());
+        record.setDescription(response.getDescription());
+        record.setTransferDate(response.getTransferDate());
+        record.setFromAccountBalance(response.getFromAccountBalance());
+    }
+
+    // Same key again: only valid for the same user asking for the same transfer
+    private TransferResponse replay(TransferRecord record, TransferRequest request) {
+        boolean sameRequest = Objects.equals(record.getUsername(), currentUser.username())
+                && Objects.equals(record.getFromAccountId(), request.getFromAccountId())
+                && Objects.equals(record.getToAccountId(), request.getToAccountId())
+                && Objects.equals(record.getBeneficiaryId(), request.getBeneficiaryId())
+                && record.getAmount().compareTo(request.getAmount()) == 0;
+        if (!sameRequest) {
+            throw new IllegalStateException(
+                    "This Idempotency-Key was already used for a different transfer");
+        }
+        return new TransferResponse(
+                record.getReference(), record.getFromAccountId(), record.getResultToAccountId(),
+                record.getToAccountNumber(), record.getBeneficiaryId(), record.getBeneficiaryName(),
+                record.getAmount(), record.getDescription(), record.getTransferDate(),
+                record.getFromAccountBalance()
+        );
     }
 
     private TransferResponse transferToBeneficiary(TransferRequest request) {
@@ -92,12 +175,13 @@ public class TransferService {
         String reference = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
         String note = request.getDescription();
+        String user = currentUser.username();
 
         transactionRepository.save(newEntry(
                 from, TransactionType.WITHDRAWAL, request.getAmount(),
                 withNote("Transfer to " + beneficiary.getName()
                         + " (" + beneficiary.getBankName() + ", A/C " + beneficiary.getAccountNumber() + ")", note),
-                reference, now));
+                reference, now, user));
 
         return new TransferResponse(
                 reference, from.getId(), null, beneficiary.getAccountNumber(),
@@ -143,13 +227,14 @@ public class TransferService {
         String reference = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
         String note = request.getDescription();
+        String user = currentUser.username();
 
         transactionRepository.save(newEntry(
                 from, TransactionType.WITHDRAWAL, amount,
-                withNote("Transfer to " + to.getAccountNumber(), note), reference, now));
+                withNote("Transfer to " + to.getAccountNumber(), note), reference, now, user));
         transactionRepository.save(newEntry(
                 to, TransactionType.DEPOSIT, amount,
-                withNote("Transfer from " + from.getAccountNumber(), note), reference, now));
+                withNote("Transfer from " + from.getAccountNumber(), note), reference, now, user));
 
         return new TransferResponse(
                 reference, fromId, toId, to.getAccountNumber(),
@@ -196,7 +281,8 @@ public class TransferService {
     }
 
     private static Transaction newEntry(BankAccount account, TransactionType type, BigDecimal amount,
-                                        String description, String reference, LocalDateTime date) {
+                                        String description, String reference, LocalDateTime date,
+                                        String createdBy) {
         Transaction transaction = new Transaction();
         transaction.setAccount(account);
         transaction.setTransactionType(type);
@@ -204,6 +290,7 @@ public class TransferService {
         transaction.setDescription(description);
         transaction.setReference(reference);
         transaction.setTransactionDate(date);
+        transaction.setCreatedBy(createdBy);
         return transaction;
     }
 }

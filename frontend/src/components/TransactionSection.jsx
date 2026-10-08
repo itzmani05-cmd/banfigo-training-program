@@ -77,7 +77,7 @@ export default function TransactionSection() {
               </select>
             </Field>
             <Field label="Amount">
-              <input className={inputClass} type="number" min="1" value={form.amount} onChange={handleChange('amount')} required />
+              <input className={inputClass} type="number" min="0.01" step="0.01" value={form.amount} onChange={handleChange('amount')} required />
             </Field>
             <Field label="Description" className="sm:col-span-2">
               <input className={inputClass} value={form.description} onChange={handleChange('description')} />
@@ -98,13 +98,14 @@ export default function TransactionSection() {
           {transactions.length === 0 ? (
             <Empty>No transactions for this account.</Empty>
           ) : (
-            <Table columns={['ID', 'Type', 'Description', 'Date', '>Amount']}>
+            <Table columns={['ID', 'Type', 'Description', 'Date', 'By', '>Amount']}>
               {transactions.map((t) => (
                 <tr key={t.id} className="hover:bg-wash/60">
                   <Td className="text-muted">{t.id}</Td>
                   <Td><TransactionTypeBadge type={t.transactionType} /></Td>
                   <Td>{t.description || '-'}</Td>
                   <Td className="whitespace-nowrap text-muted">{t.transactionDate.replace('T', ' ').slice(0, 16)}</Td>
+                  <Td className="text-muted">{t.createdBy || '-'}</Td>
                   <Td className="text-right font-bold tabular-nums">{money(t.amount)}</Td>
                 </tr>
               ))}

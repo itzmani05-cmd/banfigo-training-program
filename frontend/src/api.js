@@ -10,6 +10,7 @@ async function send(path, options = {}) {
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
+      ...options.headers,
     },
   });
 
@@ -91,7 +92,13 @@ export const ConsentApi = {
 };
 
 export const TransferApi = {
-  create: (data) => request('/transfers', { method: 'POST', body: JSON.stringify(data) }),
+  // idempotencyKey: reuse the same key when retrying the same transfer, so it can't go through twice
+  create: (data, idempotencyKey) =>
+    request('/transfers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: { 'Idempotency-Key': idempotencyKey },
+    }),
 };
 
 export const TransactionApi = {

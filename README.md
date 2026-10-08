@@ -209,6 +209,23 @@ The Docker database is separate from a PostgreSQL installed on your machine, so 
 
 ## API Endpoints
 
+Every endpoint except `/health` and `/api/info` needs a Keycloak access token (`Authorization: Bearer <token>`) for a user
+with one of the roles `ADMIN`, `MAKER`, `CHECKER` or `CUSTOMER`.
+
+- **No token, or an invalid one:** `401`.
+- **Valid token but the wrong role:** `403`.
+- **Staff roles** (`ADMIN`, `MAKER`, `CHECKER`) see every customer's data.
+- **CUSTOMER** only sees their own data. Someone else's record answers `404`, the same as a missing one.
+- **Different status codes per role:** where the same endpoint is answered differently for different roles, the Role
+  column says so.
+
+| Role | In short |
+|---|---|
+| `ADMIN` | Manages customers and opens accounts; approves, rejects or revokes consents; deletes beneficiaries |
+| `MAKER` | Moves money (deposits, withdrawals, transfers) and requests consents |
+| `CHECKER` | Approves, rejects or revokes consents; deletes beneficiaries |
+| `CUSTOMER` | Self-registered; sees their own data, transfers from their own accounts, manages their own beneficiaries |
+
 ### Health & Info
 | Method | Path | Description |
 |---|---|---|
@@ -218,31 +235,46 @@ The Docker database is separate from a PostgreSQL installed on your machine, so 
 Both endpoints are public (no token required).
 
 ### Customers — `/api/customers`
-| Method | Path | Description |
-|---|---|---|
-| POST | `/` | Create a customer |
-| GET | `/` | List all customers |
-| GET | `/{id}` | Get a customer by id |
-| PUT | `/{id}` | Update a customer |
-| DELETE | `/{id}` | Delete a customer |
+| Method | Path | Role | Description |
+|---|---|---|---|
+| POST | `/` | `ADMIN` | Create a customer |
+| GET | `/` | `ADMIN`, `MAKER`, `CHECKER` | List all customers |
+| GET | `/{id}` | `ADMIN`, `MAKER`, `CHECKER` | Get a customer by id |
+| PUT | `/{id}` | `ADMIN` | Update a customer |
+| DELETE | `/{id}` | `ADMIN` | Delete a customer (`409` while they still have accounts, beneficiaries or consents) |
+
+### My profile — `/api/me`
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/` | `CUSTOMER` | The logged-in customer's own record. The first call creates it from the token (see [Customer sign-up](#customer-sign-up)) |
 
 ### Bank Accounts — `/api/accounts`
-| Method | Path | Description |
-|---|---|---|
-| POST | `/` | Open a new account for a customer |
-| GET | `/` | List all accounts |
-| GET | `/{accountId}` | Get an account by id |
+| Method | Path | Role | Description |
+|---|---|---|---|
+| POST | `/` | `ADMIN` | Open a new account for a customer |
+| GET | `/` | any role (CUSTOMER: own) | List accounts |
+| GET | `/{accountId}` | any role (CUSTOMER: own) | Get an account by id |
 
 ### Transactions — `/api/accounts/{accountId}/transactions`
-| Method | Path | Description |
-|---|---|---|
-| POST | `/` | Create a deposit or withdrawal |
-| GET | `/` | List transactions for an account |
+| Method | Path | Role | Description |
+|---|---|---|---|
+| POST | `/` | `MAKER` | Create a deposit or withdrawal |
+| GET | `/?page=0&size=10&from=&to=&type=` | any role (CUSTOMER: own) | List transactions for an account, newest first (all filters optional) |
+
+Request body: `{ "transactionType": "DEPOSIT", "amount": 500.00, "description": "Salary" }` (`DEPOSIT` or `WITHDRAWAL`).
+
+Amount rules for deposits, withdrawals and transfers:
+- More than 0, with at most 2 decimal places.
+- At most 100,000 per transaction (`banfigo.limits.max-transaction-amount`).
+- A withdrawal or transfer can't take the balance below 0.
 
 ### Transfers — `/api/transfers`
 | Method | Path | Description |
 |---|---|---|
-| POST | `/` | Move money to another account or a saved beneficiary (requires `MAKER` role) |
+| POST | `/` | Move money to another account or a saved beneficiary (`MAKER`, or a `CUSTOMER` from their own account) |
+
+A CUSTOMER can transfer account-to-account only between their own accounts. To pay anyone else they use one of their
+own saved beneficiaries.
 
 Request body: `{ "fromAccountId": 1, "toAccountId": 2, "amount": 250.00, "description": "Rent" }`, or with `"beneficiaryId": 5` instead of `toAccountId`.
 
@@ -250,24 +282,31 @@ Paying a beneficiary: the source account must belong to the customer who saved t
 
 A transfer is all-or-nothing: it writes a `WITHDRAWAL` on the source account and a `DEPOSIT` on the destination, both with the same `reference`, in one database transaction. Both account rows are locked (lowest id first) so concurrent transfers can't overdraw an account or deadlock.
 
+**Retries are safe with an `Idempotency-Key` header.** Send a unique value, such as a UUID, with each transfer and reuse it when retrying. If a request with that key already succeeded, the API returns the original result instead of moving the money again. If two requests with the same key arrive together, only one goes through. Using the key for a different transfer, or as a different user, returns `409`. A transfer that failed (for example, insufficient balance) leaves the key unused, so it can be retried. The header is optional, but the frontend always sends it.
+
+**Who moved the money:** every transaction row stores `createdBy`, the login name of the user who made the deposit, withdrawal or transfer. It's returned in the transaction list and shown in the "By" column. Rows from before this was added show `-`.
+
 ### Statements — `/api/accounts/{accountId}/statement`
-| Method | Path | Description |
-|---|---|---|
-| GET | `/?from=2026-10-01&to=2026-10-31&format=pdf` | Download a statement as `pdf` or `csv` (default) |
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/?from=2026-10-01&to=2026-10-31&format=pdf` | any role (CUSTOMER: own) | Download a statement as `pdf` or `csv` (default) |
 
 Includes the opening balance, every transaction with a running balance, total debits/credits, and the closing balance. The period can be at most one year.
 
 ### Dashboard — `/api/dashboard`
-| Method | Path | Description |
-|---|---|---|
-| GET | `/` | Total balance, account and customer counts, 10 most recent transactions, and money in/out for the last 6 months |
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/` | any role (CUSTOMER: own figures) | Total balance, account and customer counts, 10 most recent transactions, and money in/out for the last 6 months |
 
 ### Beneficiaries — `/api/beneficiaries`
-| Method | Path | Description |
-|---|---|---|
-| POST | `/` | Add a beneficiary |
-| GET | `/` | List all beneficiaries |
-| DELETE | `/{id}` | Remove a beneficiary |
+| Method | Path | Role | Description |
+|---|---|---|---|
+| POST | `/` | any role (CUSTOMER: for themselves) | Add a beneficiary |
+| GET | `/` | any role (CUSTOMER: own) | List beneficiaries |
+| DELETE | `/{id}` | `ADMIN`, `CHECKER`, or `CUSTOMER` (own) | Remove a beneficiary |
+
+Request body: `{ "name": "Ravi Kumar", "accountNumber": "50100234567890", "bankName": "HDFC Bank", "ifscCode": "HDFC0001234", "customerId": 1 }`.
+A CUSTOMER leaves out `customerId`, because their beneficiaries are always their own.
 
 ### Consents — `/api/consents`
 Open Banking style consents: a customer lets a third-party provider (TPP) access some of their accounts. Requests follow a maker-checker flow.
@@ -275,8 +314,8 @@ Open Banking style consents: a customer lets a third-party provider (TPP) access
 | Method | Path | Role | Description |
 |---|---|---|---|
 | POST | `/` | `MAKER` | Create a consent request (status `AWAITING_AUTHORISATION`) |
-| GET | `/?status=AUTHORISED` | any logged-in user | List consents, newest first (`status` is optional) |
-| GET | `/{id}` | any logged-in user | Get a consent by id |
+| GET | `/?status=AUTHORISED` | any role (CUSTOMER: own) | List consents, newest first (`status` is optional) |
+| GET | `/{id}` | any role (CUSTOMER: own) | Get a consent by id |
 | POST | `/{id}/approve` | `CHECKER` or `ADMIN` | Approve a pending consent (status `AUTHORISED`) |
 | POST | `/{id}/reject` | `CHECKER` or `ADMIN` | Reject a pending consent, optional body `{ "reason": "..." }` |
 | POST | `/{id}/revoke` | `CHECKER` or `ADMIN` | Withdraw an authorised consent, optional body `{ "reason": "..." }` |

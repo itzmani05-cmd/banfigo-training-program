@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AccountApi, BeneficiaryApi, TransferApi } from '../api';
 import { money } from '../format';
 import { can, rolesFor } from '../permissions';
 import { Alert, Button, Card, DetailList, Field, FormActions, FormGrid, PageHeader, Tabs, ViewOnly, inputClass } from './ui';
 
 const EMPTY_FORM = { fromAccountId: '', toAccountId: '', beneficiaryId: '', amount: '', description: '' };
+
+// crypto.randomUUID only exists on https or localhost
+const newKey = () => crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 const accountLabel = (a) => `${a.accountNumber} - ${a.customerName || `Customer ${a.customerId}`} (balance ${a.balance})`;
 
@@ -16,6 +19,9 @@ export default function TransferSection() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  // One key per transfer attempt: kept if the request fails so "Transfer" again can't pay twice,
+  // replaced once it succeeds or the form changes
+  const idempotencyKey = useRef(null);
 
   const loadOptions = async () => {
     try {
@@ -38,6 +44,7 @@ export default function TransferSection() {
     : [];
 
   const handleChange = (field) => (e) => {
+    idempotencyKey.current = null;
     const next = { ...form, [field]: e.target.value };
     // A beneficiary picked for the previous source account may not belong to the new one
     if (field === 'fromAccountId') next.beneficiaryId = '';
@@ -45,6 +52,7 @@ export default function TransferSection() {
   };
 
   const switchMode = (next) => {
+    idempotencyKey.current = null;
     setMode(next);
     setForm({ ...form, toAccountId: '', beneficiaryId: '' });
     setError('');
@@ -59,6 +67,7 @@ export default function TransferSection() {
     setError('');
     setResult(null);
     setLoading(true);
+    idempotencyKey.current ??= newKey();
     try {
       const transfer = await TransferApi.create({
         fromAccountId: Number(form.fromAccountId),
@@ -67,7 +76,8 @@ export default function TransferSection() {
           : { beneficiaryId: Number(form.beneficiaryId) }),
         amount: Number(form.amount),
         description: form.description,
-      });
+      }, idempotencyKey.current);
+      idempotencyKey.current = null;
       setResult(transfer);
       setForm(EMPTY_FORM);
       await loadOptions(); // refresh balances shown in the dropdowns

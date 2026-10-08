@@ -172,13 +172,14 @@ export default function AccountDetails({ accountId, onBack }) {
               <Empty>No transactions found.</Empty>
             ) : (
               <>
-                <Table columns={['ID', 'Type', 'Description', 'Date', '>Amount']}>
+                <Table columns={['ID', 'Type', 'Description', 'Date', 'By', '>Amount']}>
                   {transactions.map((t) => (
                     <tr key={t.id} className="hover:bg-wash/60">
                       <Td className="text-muted">{t.id}</Td>
                       <Td><TransactionTypeBadge type={t.transactionType} /></Td>
                       <Td>{t.description || '-'}</Td>
                       <Td className="whitespace-nowrap text-muted">{t.transactionDate.replace('T', ' ').slice(0, 16)}</Td>
+                      <Td className="text-muted">{t.createdBy || '-'}</Td>
                       <Td className="text-right font-bold tabular-nums">{money(t.amount)}</Td>
                     </tr>
                   ))}

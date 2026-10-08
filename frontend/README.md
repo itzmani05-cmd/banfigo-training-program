@@ -57,7 +57,18 @@ Create the client once in the Keycloak admin console (realm `BanfigoNew`):
 4. **Valid post logout redirect URIs**: `http://localhost:5173/*`
 5. **Web origins**: `http://localhost:5173`
 
-Users need realm roles for anything beyond viewing: `ADMIN` (create accounts, create/edit/delete customers, delete beneficiaries, approve/reject/revoke consents), `MAKER` (create transactions, request consents), `CHECKER` (delete beneficiaries, approve/reject/revoke consents).
+Every user needs one of these realm roles. A user without one gets `403` from the API.
+
+| Role | Can do |
+|---|---|
+| `ADMIN` | Create accounts; create, edit and delete customers; delete beneficiaries; approve, reject and revoke consents |
+| `MAKER` | Create transactions and transfers; request consents |
+| `CHECKER` | Delete beneficiaries; approve, reject and revoke consents |
+| `CUSTOMER` | Given automatically to anyone who signs up with **Register** on the login page. Sees only their own accounts, transactions, beneficiaries and consents, and makes transfers from their own accounts |
+
+All staff roles can view everything. A CUSTOMER doesn't see the **Customers** and **Transactions** tabs; their history is
+under **Accounts → View**. The UI hides actions a role can't perform, but the backend is what enforces the rules
+(`src/permissions.js` mirrors `SecurityConfig.java`).
 
 To try the consent flow, log in as a `MAKER` user to raise a request on the **Consents** tab, then log in as a different `CHECKER` or `ADMIN` user to approve or reject it. The same user can't do both.
 

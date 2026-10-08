@@ -13,11 +13,12 @@ public class TransactionResponse {
     private LocalDateTime transactionDate;
     private Long accountId;
     private String reference;
+    private String createdBy;
 
     public TransactionResponse() {
     
     }
-    public TransactionResponse(Long id, TransactionType transactionType,BigDecimal amount, String description, LocalDateTime transactionDate,Long accountId, String reference) {
+    public TransactionResponse(Long id, TransactionType transactionType,BigDecimal amount, String description, LocalDateTime transactionDate,Long accountId, String reference, String createdBy) {
         this.id = id;
         this.transactionType = transactionType;
         this.amount = amount;
@@ -25,6 +26,7 @@ public class TransactionResponse {
         this.transactionDate = transactionDate;
         this.accountId = accountId;
         this.reference = reference;
+        this.createdBy = createdBy;
     }
     public Long getId() {
         return id;
@@ -50,5 +52,9 @@ public class TransactionResponse {
 
     public String getReference() {
         return reference;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
     }
 }

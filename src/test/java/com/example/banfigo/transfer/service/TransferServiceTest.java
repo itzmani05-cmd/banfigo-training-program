@@ -13,6 +13,8 @@ import com.example.banfigo.transaction.repository.TransactionRepository;
 import com.example.banfigo.transaction.service.TransactionLimitPolicy;
 import com.example.banfigo.transfer.dto.TransferRequest;
 import com.example.banfigo.transfer.dto.TransferResponse;
+import com.example.banfigo.transfer.entity.TransferRecord;
+import com.example.banfigo.transfer.repository.TransferRecordRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -32,6 +34,8 @@ class TransferServiceTest {
     private TransactionRepository transactionRepository;
     private BeneficiaryRepository beneficiaryRepository;
     private CurrentUser currentUser;
+    private TransferRecordRepository transferRecordRepository;
+    private TransferRecord savedRecord;
     private TransferService transferService;
 
     private Customer alice;
@@ -47,8 +51,19 @@ class TransferServiceTest {
         // Staff by default: every record is visible
         currentUser = mock(CurrentUser.class);
         when(currentUser.canAccess(any())).thenReturn(true);
+        when(currentUser.username()).thenReturn("maker1");
+        transferRecordRepository = mock(TransferRecordRepository.class);
+        when(transferRecordRepository.findById(any())).thenReturn(Optional.empty());
+        // Like the real merge, hand back a managed copy rather than the object passed in
+        when(transferRecordRepository.saveAndFlush(any())).thenAnswer(inv -> {
+            TransferRecord copy = new TransferRecord();
+            copy.setIdempotencyKey(inv.<TransferRecord>getArgument(0).getIdempotencyKey());
+            copy.setUsername(inv.<TransferRecord>getArgument(0).getUsername());
+            savedRecord = copy;
+            return copy;
+        });
         transferService = new TransferService(accountRepository, transactionRepository, beneficiaryRepository,
-                new TransactionLimitPolicy(new BigDecimal("1000")), currentUser);
+                transferRecordRepository, new TransactionLimitPolicy(new BigDecimal("1000")), currentUser);
 
         alice = new Customer(10L, "Alice", "alice@example.com", null, null);
         bob = new Customer(20L, "Bob", "bob@example.com", null, null);
@@ -192,6 +207,67 @@ class TransferServiceTest {
                 () -> transferService.transfer(beneficiaryRequest(1L, 8L, "10")));
 
         assertEquals(new BigDecimal("500.00"), accountA.getBalance());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void recordsWhoMadeTheTransferOnBothEntries() {
+        transferService.transfer(request(1L, 2L, "10.00", null));
+
+        ArgumentCaptor<Transaction> saved = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository, times(2)).save(saved.capture());
+        assertTrue(saved.getAllValues().stream().allMatch(t -> "maker1".equals(t.getCreatedBy())));
+    }
+
+    @Test
+    void claimsTheIdempotencyKeyAndStoresTheResult() {
+        TransferResponse response = transferService.transfer(request(1L, 2L, "25.00", null), "key-1");
+
+        ArgumentCaptor<TransferRecord> claim = ArgumentCaptor.forClass(TransferRecord.class);
+        verify(transferRecordRepository).saveAndFlush(claim.capture());
+        assertEquals("key-1", claim.getValue().getIdempotencyKey());
+        assertEquals("maker1", claim.getValue().getUsername());
+        assertEquals(new BigDecimal("25.00"), claim.getValue().getAmount());
+        // The result goes on the managed copy, which is what gets saved
+        assertEquals(response.getReference(), savedRecord.getReference());
+        assertEquals(new BigDecimal("475.00"), savedRecord.getFromAccountBalance());
+    }
+
+    @Test
+    void repeatedIdempotencyKeyReturnsTheFirstResultWithoutMovingMoney() {
+        TransferRecord previous = new TransferRecord();
+        previous.setIdempotencyKey("key-1");
+        previous.setUsername("maker1");
+        previous.setFromAccountId(1L);
+        previous.setToAccountId(2L);
+        previous.setAmount(new BigDecimal("25.00"));
+        previous.setReference("ref-123");
+        previous.setResultToAccountId(2L);
+        previous.setFromAccountBalance(new BigDecimal("475.00"));
+        when(transferRecordRepository.findById("key-1")).thenReturn(Optional.of(previous));
+
+        TransferResponse response = transferService.transfer(request(1L, 2L, "25", null), "key-1");
+
+        assertEquals("ref-123", response.getReference());
+        assertEquals(new BigDecimal("475.00"), response.getFromAccountBalance());
+        assertEquals(new BigDecimal("500.00"), accountA.getBalance());
+        verify(accountRepository, never()).findByIdForUpdate(any());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsIdempotencyKeyReusedForADifferentTransfer() {
+        TransferRecord previous = new TransferRecord();
+        previous.setUsername("maker1");
+        previous.setFromAccountId(1L);
+        previous.setToAccountId(2L);
+        previous.setAmount(new BigDecimal("25.00"));
+        when(transferRecordRepository.findById("key-1")).thenReturn(Optional.of(previous));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> transferService.transfer(request(1L, 2L, "30.00", null), "key-1"));
+
+        assertEquals("This Idempotency-Key was already used for a different transfer", ex.getMessage());
         verify(transactionRepository, never()).save(any());
     }
 

@@ -34,4 +34,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
     List<Transaction> findTop10ByOrderByTransactionDateDescIdDesc();
 
     List<Transaction> findByTransactionDateGreaterThanEqual(LocalDateTime since);
+
+    // Same as the two above, limited to one customer's accounts
+    @EntityGraph(attributePaths = "account")
+    List<Transaction> findTop10ByAccountCustomerIdOrderByTransactionDateDescIdDesc(Long customerId);
+
+    List<Transaction> findByAccountCustomerIdAndTransactionDateGreaterThanEqual(Long customerId, LocalDateTime since);
 }

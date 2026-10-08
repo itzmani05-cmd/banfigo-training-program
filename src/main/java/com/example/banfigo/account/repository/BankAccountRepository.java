@@ -8,12 +8,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 public interface BankAccountRepository extends JpaRepository<BankAccount, Long> {
     boolean existsByAccountNumber(String accountNumber);
 
     long countByCustomerId(Long customerId);
+
+    List<BankAccount> findByCustomerId(Long customerId);
 
     // SELECT ... FOR UPDATE: locks the account row until the transaction ends,
     // so concurrent balance updates on the same account run one after another.
@@ -23,6 +26,9 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, Long> 
 
     @Query("SELECT COALESCE(SUM(a.balance), 0) FROM BankAccount a")
     BigDecimal sumAllBalances();
+
+    @Query("SELECT COALESCE(SUM(a.balance), 0) FROM BankAccount a WHERE a.customer.id = :customerId")
+    BigDecimal sumBalancesByCustomerId(@Param("customerId") Long customerId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM BankAccount a WHERE a.id = :id")

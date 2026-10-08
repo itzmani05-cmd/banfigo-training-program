@@ -2,6 +2,7 @@ package com.example.banfigo.dashboard.service;
 
 import com.example.banfigo.account.repository.BankAccountRepository;
 import com.example.banfigo.customer.repository.CustomerRepository;
+import com.example.banfigo.customer.service.CurrentUser;
 import com.example.banfigo.dashboard.dto.DashboardResponse;
 import com.example.banfigo.transaction.entity.Transaction;
 import com.example.banfigo.transaction.entity.TransactionType;
@@ -27,15 +28,17 @@ public class DashboardService {
     private final BankAccountRepository bankAccountRepository;
     private final CustomerRepository customerRepository;
     private final TransactionRepository transactionRepository;
+    private final CurrentUser currentUser;
     private final Clock clock;
 
     @Autowired
     public DashboardService(
             BankAccountRepository bankAccountRepository,
             CustomerRepository customerRepository,
-            TransactionRepository transactionRepository) {
+            TransactionRepository transactionRepository,
+            CurrentUser currentUser) {
 
-        this(bankAccountRepository, customerRepository, transactionRepository, Clock.systemDefaultZone());
+        this(bankAccountRepository, customerRepository, transactionRepository, currentUser, Clock.systemDefaultZone());
     }
 
     // Lets tests fix "today"
@@ -43,19 +46,28 @@ public class DashboardService {
             BankAccountRepository bankAccountRepository,
             CustomerRepository customerRepository,
             TransactionRepository transactionRepository,
+            CurrentUser currentUser,
             Clock clock) {
 
         this.bankAccountRepository = bankAccountRepository;
         this.customerRepository = customerRepository;
         this.transactionRepository = transactionRepository;
+        this.currentUser = currentUser;
         this.clock = clock;
     }
 
+    // Staff see the whole bank; a customer sees the same figures for their own accounts
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard() {
 
+        Long scope = currentUser.customerScope();
+
+        List<Transaction> latest = scope == null
+                ? transactionRepository.findTop10ByOrderByTransactionDateDescIdDesc()
+                : transactionRepository.findTop10ByAccountCustomerIdOrderByTransactionDateDescIdDesc(scope);
+
         List<DashboardResponse.RecentTransaction> recent =
-                transactionRepository.findTop10ByOrderByTransactionDateDescIdDesc().stream()
+                latest.stream()
                         .map(t -> new DashboardResponse.RecentTransaction(
                                 t.getId(),
                                 t.getTransactionType(),
@@ -67,16 +79,25 @@ public class DashboardService {
                         ))
                         .toList();
 
+        if (scope == null) {
+            return new DashboardResponse(
+                    bankAccountRepository.sumAllBalances(),
+                    bankAccountRepository.count(),
+                    customerRepository.count(),
+                    recent,
+                    monthlyFlows(null)
+            );
+        }
         return new DashboardResponse(
-                bankAccountRepository.sumAllBalances(),
-                bankAccountRepository.count(),
-                customerRepository.count(),
+                bankAccountRepository.sumBalancesByCustomerId(scope),
+                bankAccountRepository.countByCustomerId(scope),
+                1,
                 recent,
-                monthlyFlows()
+                monthlyFlows(scope)
         );
     }
 
-    private List<DashboardResponse.MonthlyFlow> monthlyFlows() {
+    private List<DashboardResponse.MonthlyFlow> monthlyFlows(Long scope) {
 
         YearMonth current = YearMonth.now(clock);
         YearMonth first = current.minusMonths(MONTHS - 1);
@@ -88,7 +109,10 @@ public class DashboardService {
         }
 
         LocalDateTime since = first.atDay(1).atStartOfDay();
-        for (Transaction t : transactionRepository.findByTransactionDateGreaterThanEqual(since)) {
+        List<Transaction> transactions = scope == null
+                ? transactionRepository.findByTransactionDateGreaterThanEqual(since)
+                : transactionRepository.findByAccountCustomerIdAndTransactionDateGreaterThanEqual(scope, since);
+        for (Transaction t : transactions) {
             BigDecimal[] inOut = totals.get(YearMonth.from(t.getTransactionDate()));
             if (inOut == null) {
                 continue; // dated in the future

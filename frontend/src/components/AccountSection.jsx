@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AccountApi } from '../api';
 import { money } from '../format';
 import AccountDetails from './AccountDetails';
-import { can, rolesFor } from '../permissions';
+import { can, isCustomer, rolesFor } from '../permissions';
 import { Alert, Badge, Button, Card, Empty, Field, FormActions, FormGrid, PageHeader, Table, Td, ViewOnly, inputClass } from './ui';
 
 const EMPTY_FORM = { accountNumber: '', accountType: '', customerId: '' };
@@ -55,7 +55,10 @@ export default function AccountSection() {
 
   return (
     <div>
-      <PageHeader title="Bank Accounts" description="Open new accounts and view balances and history." />
+      <PageHeader
+        title="Bank Accounts"
+        description={isCustomer() ? 'Your accounts, balances and statements.' : 'Open new accounts and view balances and history.'}
+      />
 
       <Alert>{error}</Alert>
 
@@ -85,10 +88,14 @@ export default function AccountSection() {
           </FormGrid>
         </Card>
       ) : (
-        <ViewOnly>Opening accounts requires the {rolesFor('createAccount')} role.</ViewOnly>
+        <ViewOnly>
+          {isCustomer()
+            ? 'To open a new account, contact the bank.'
+            : `Opening accounts requires the ${rolesFor('createAccount')} role.`}
+        </ViewOnly>
       )}
 
-      <Card title={`All accounts (${accounts.length})`}>
+      <Card title={`${isCustomer() ? 'Your' : 'All'} accounts (${accounts.length})`}>
         {accounts.length === 0 ? (
           <Empty>No accounts yet.</Empty>
         ) : (

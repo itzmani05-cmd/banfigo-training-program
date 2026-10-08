@@ -1,5 +1,6 @@
 package com.example.banfigo.customer.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,6 +17,11 @@ public class Customer {
     private String email;
     private String phone;
     private String address;
+
+    // Keycloak user id (the token's "sub") of the customer's own login; null for customers created by staff
+    @Column(name="keycloak_user_id", unique=true)
+    private String keycloakUserId;
+
     public Customer(){
 
     }
@@ -55,5 +61,11 @@ public class Customer {
     }
     public void setAddress(String address){
         this.address = address;
+    }
+    public String getKeycloakUserId(){
+        return keycloakUserId;
+    }
+    public void setKeycloakUserId(String keycloakUserId){
+        this.keycloakUserId = keycloakUserId;
     }
 }

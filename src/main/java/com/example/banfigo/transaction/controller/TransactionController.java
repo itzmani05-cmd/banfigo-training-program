@@ -31,10 +31,7 @@ public class TransactionController {
     public ResponseEntity<TransactionResponse> createTransaction(
             @PathVariable Long accountId,
             @Valid @RequestBody TransactionRequest request) {
-
-        TransactionResponse transaction =
-                transactionService.createTransaction(accountId, request);
-
+        TransactionResponse transaction= transactionService.createTransaction(accountId, request);
         return new ResponseEntity<>(transaction, HttpStatus.CREATED);
     }
 
@@ -45,11 +42,9 @@ public class TransactionController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) TransactionType type,
             @PageableDefault(size = 10, sort = "transactionDate", direction = Sort.Direction.DESC)
-            Pageable pageable) {
-
-        Page<TransactionResponse> transactions =
-                transactionService.getTransactions(accountId, from, to, type, pageable);
-
+            Pageable pageable
+    ) {
+        Page<TransactionResponse> transactions = transactionService.getTransactions(accountId, from, to, type, pageable);
         return ResponseEntity.ok(PageResponse.from(transactions));
     }
 }

@@ -11,6 +11,7 @@ import com.example.banfigo.consent.entity.ConsentStatus;
 import com.example.banfigo.consent.repository.ConsentRepository;
 import com.example.banfigo.customer.entity.Customer;
 import com.example.banfigo.customer.repository.CustomerRepository;
+import com.example.banfigo.customer.service.CurrentUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -26,6 +27,12 @@ import static org.mockito.Mockito.*;
 
 class ConsentServiceTest {
 
+    private static CurrentUser staff() {
+        CurrentUser currentUser = mock(CurrentUser.class);
+        when(currentUser.canAccess(any())).thenReturn(true);
+        return currentUser;
+    }
+
     private ConsentRepository consentRepository;
     private CustomerRepository customerRepository;
     private BankAccountRepository accountRepository;
@@ -40,7 +47,7 @@ class ConsentServiceTest {
         consentRepository = mock(ConsentRepository.class);
         customerRepository = mock(CustomerRepository.class);
         accountRepository = mock(BankAccountRepository.class);
-        consentService = new ConsentService(consentRepository, customerRepository, accountRepository);
+        consentService = new ConsentService(consentRepository, customerRepository, accountRepository, staff());
 
         alice = new Customer(10L, "Alice", "alice@example.com", null, null);
         Customer bob = new Customer(20L, "Bob", "bob@example.com", null, null);

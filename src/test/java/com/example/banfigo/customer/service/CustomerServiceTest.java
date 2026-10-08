@@ -31,7 +31,8 @@ class CustomerServiceTest {
         accountRepository = mock(BankAccountRepository.class);
         beneficiaryRepository = mock(BeneficiaryRepository.class);
         consentRepository = mock(ConsentRepository.class);
-        customerService = new CustomerService(customerRepository, accountRepository, beneficiaryRepository, consentRepository);
+        customerService = new CustomerService(customerRepository, accountRepository, beneficiaryRepository, consentRepository,
+                mock(CurrentUser.class));
 
         alice = new Customer(10L, "Alice", "alice@example.com", null, null);
         when(customerRepository.findById(10L)).thenReturn(Optional.of(alice));

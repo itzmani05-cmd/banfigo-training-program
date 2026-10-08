@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AccountApi, ConsentApi, CustomerApi } from '../api';
 import { getUser } from '../auth';
-import { can, rolesFor } from '../permissions';
+import { can, isCustomer, rolesFor } from '../permissions';
 import { Alert, Badge, Button, Card, Empty, Field, FormActions, FormGrid, PageHeader, Table, Td, ViewOnly, inputClass } from './ui';
 
 const PERMISSIONS = [
@@ -146,12 +146,16 @@ export default function ConsentSection() {
     <div>
       <PageHeader
         title="Consents"
-        description="A third-party provider (TPP) asks for access to a customer's accounts. A MAKER raises the request, then a different CHECKER or ADMIN approves or rejects it."
+        description={
+          isCustomer()
+            ? 'Third-party providers (TPPs) that have asked for access to your accounts, and whether the bank approved it.'
+            : "A third-party provider (TPP) asks for access to a customer's accounts. A MAKER raises the request, then a different CHECKER or ADMIN approves or rejects it."
+        }
       />
 
       <Alert>{error}</Alert>
 
-      {!canCreate && !canDecide && (
+      {!canCreate && !canDecide && !isCustomer() && (
         <ViewOnly>
           You can view consents. Requesting one requires the {rolesFor('requestConsent')} role; approving, rejecting or
           revoking requires {rolesFor('decideConsent')}.

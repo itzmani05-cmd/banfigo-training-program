@@ -17,14 +17,17 @@ public class CustomerService {
     private final BankAccountRepository accountRepository;
     private final BeneficiaryRepository beneficiaryRepository;
     private final ConsentRepository consentRepository;
+    private final CurrentUser currentUser;
     public CustomerService(CustomerRepository customerRespository,
                            BankAccountRepository accountRepository,
                            BeneficiaryRepository beneficiaryRepository,
-                           ConsentRepository consentRepository){
+                           ConsentRepository consentRepository,
+                           CurrentUser currentUser){
         this.customerRespository = customerRespository;
         this.accountRepository = accountRepository;
         this.beneficiaryRepository = beneficiaryRepository;
         this.consentRepository = consentRepository;
+        this.currentUser = currentUser;
     }
     public CustomerResponse createCustomer(CustomerRequest request){
         Customer customer=new Customer();
@@ -44,6 +47,9 @@ public class CustomerService {
     public CustomerResponse getCustomerById(Long id){
         Customer customer =customerRespository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + id));
         return mapToResponse(customer);
+    }
+    public CustomerResponse getCurrentCustomer(){
+        return mapToResponse(currentUser.customer());
     }
     public CustomerResponse updateCustomer(Long id, CustomerRequest request){
         Customer customer=customerRespository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + id));

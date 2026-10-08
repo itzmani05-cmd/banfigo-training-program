@@ -20,6 +20,12 @@ import java.util.Map;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    // Bank staff see every customer's data; CUSTOMER is a self-registered user limited to their own
+    // (enforced in the services through CurrentUser)
+    private static final String[] STAFF = {"ADMIN", "MAKER", "CHECKER"};
+    private static final String CUSTOMER = "CUSTOMER";
+    private static final String[] ANY_USER = {"ADMIN", "MAKER", "CHECKER", CUSTOMER};
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
@@ -34,12 +40,15 @@ public class SecurityConfig {
                                 "/api/info"
                         ).permitAll()
 
-                        // Bank accounts
+                        // The logged-in customer's own record
+                        .requestMatchers("/api/me").hasRole(CUSTOMER)
+
+                        // Bank accounts (customers only get their own; the services filter)
                         .requestMatchers(
                                 org.springframework.http.HttpMethod.GET,
                                 "/api/accounts",
                                 "/api/accounts/**"
-                        ).authenticated()
+                        ).hasAnyRole(ANY_USER)
 
                         .requestMatchers(
                                 org.springframework.http.HttpMethod.POST,
@@ -52,26 +61,21 @@ public class SecurityConfig {
                                 "/api/accounts/*/transactions"
                         ).hasRole("MAKER")
 
-                        .requestMatchers(
-                                org.springframework.http.HttpMethod.GET,
-                                "/api/accounts/*/transactions"
-                        ).authenticated()
-
-                        // Transfers
+                        // Transfers: staff, or a customer paying from their own account
                         .requestMatchers(
                                 org.springframework.http.HttpMethod.POST,
                                 "/api/transfers"
-                        ).hasRole("MAKER")
+                        ).hasAnyRole("MAKER", CUSTOMER)
 
-                        // Beneficiaries
+                        // Beneficiaries: a customer manages their own list
                         .requestMatchers(
                                 org.springframework.http.HttpMethod.DELETE,
                                 "/api/beneficiaries/*"
-                        ).hasAnyRole("ADMIN", "CHECKER")
+                        ).hasAnyRole("ADMIN", "CHECKER", CUSTOMER)
 
                         .requestMatchers(
                                 "/api/beneficiaries/**"
-                        ).authenticated()
+                        ).hasAnyRole(ANY_USER)
 
                         // Consents: MAKER raises a request, CHECKER / ADMIN decides on it
                         .requestMatchers(
@@ -90,14 +94,14 @@ public class SecurityConfig {
                                 org.springframework.http.HttpMethod.GET,
                                 "/api/consents",
                                 "/api/consents/**"
-                        ).authenticated()
+                        ).hasAnyRole(ANY_USER)
 
-                        // Customers
+                        // Customers: the bank's customer list is for staff only
                         .requestMatchers(
                                 org.springframework.http.HttpMethod.GET,
                                 "/api/customers",
                                 "/api/customers/**"
-                        ).authenticated()
+                        ).hasAnyRole(STAFF)
 
                         .requestMatchers(
                                 "/api/customers",
@@ -107,8 +111,8 @@ public class SecurityConfig {
                         // Spring's error page, so error responses aren't turned into 401s
                         .requestMatchers("/error").permitAll()
 
-                        // Anything not listed above needs a logged-in user
-                        .anyRequest().authenticated()
+                        // Anything not listed above (e.g. the dashboard) needs one of the app's roles
+                        .anyRequest().hasAnyRole(ANY_USER)
                 )
 
                 .oauth2ResourceServer(oauth2 ->

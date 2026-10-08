@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { BeneficiaryApi } from '../api';
-import { can } from '../permissions';
+import { can, isCustomer } from '../permissions';
 import { Alert, Button, Card, Empty, Field, FormActions, FormGrid, PageHeader, Table, Td, inputClass } from './ui';
 
 const EMPTY_FORM = { name: '', accountNumber: '', bankName: '', ifscCode: '', customerId: '' };
 
 export default function BeneficiarySection() {
   const canDelete = can('deleteBeneficiary');
+  // A customer always adds to their own list, so there's no customer to pick
+  const customer = isCustomer();
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
@@ -32,7 +34,7 @@ export default function BeneficiarySection() {
     setError('');
     setLoading(true);
     try {
-      await BeneficiaryApi.create({ ...form, customerId: Number(form.customerId) });
+      await BeneficiaryApi.create({ ...form, customerId: customer ? null : Number(form.customerId) });
       setForm(EMPTY_FORM);
       await load();
     } catch (err) {
@@ -54,7 +56,10 @@ export default function BeneficiarySection() {
 
   return (
     <div>
-      <PageHeader title="Beneficiaries" description="Saved payees a customer can send money to." />
+      <PageHeader
+        title="Beneficiaries"
+        description={customer ? 'People you can send money to.' : 'Saved payees a customer can send money to.'}
+      />
 
       <Alert>{error}</Alert>
 
@@ -72,9 +77,11 @@ export default function BeneficiarySection() {
           <Field label="IFSC Code">
             <input className={inputClass} value={form.ifscCode} onChange={handleChange('ifscCode')} placeholder="ABCD0123456" required />
           </Field>
-          <Field label="Customer ID">
-            <input className={inputClass} type="number" value={form.customerId} onChange={handleChange('customerId')} required />
-          </Field>
+          {!customer && (
+            <Field label="Customer ID">
+              <input className={inputClass} type="number" value={form.customerId} onChange={handleChange('customerId')} required />
+            </Field>
+          )}
           <FormActions>
             <Button type="submit" variant="primary" disabled={loading}>
               {loading ? 'Adding...' : 'Add Beneficiary'}
@@ -83,7 +90,7 @@ export default function BeneficiarySection() {
         </FormGrid>
       </Card>
 
-      <Card title={`All beneficiaries (${beneficiaries.length})`}>
+      <Card title={`${customer ? 'Your' : 'All'} beneficiaries (${beneficiaries.length})`}>
         {beneficiaries.length === 0 ? (
           <Empty>No beneficiaries yet.</Empty>
         ) : (

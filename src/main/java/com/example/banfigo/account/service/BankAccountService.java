@@ -7,6 +7,7 @@ import com.example.banfigo.account.repository.BankAccountRepository;
 import com.example.banfigo.common.exception.ResourceNotFoundException;
 import com.example.banfigo.customer.entity.Customer;
 import com.example.banfigo.customer.repository.CustomerRepository;
+import com.example.banfigo.customer.service.CurrentUser;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,9 +16,12 @@ import java.util.List;
 public class BankAccountService {
     private final BankAccountRepository bankAccountRepository;
     private final CustomerRepository customerRepository;
-    public BankAccountService(BankAccountRepository bankAccountRepository, CustomerRepository customerRepository) {
+    private final CurrentUser currentUser;
+    public BankAccountService(BankAccountRepository bankAccountRepository, CustomerRepository customerRepository,
+                              CurrentUser currentUser) {
         this.bankAccountRepository = bankAccountRepository;
         this.customerRepository = customerRepository;
+        this.currentUser = currentUser;
     }
     public AccountResponse createBankAccount(AccountRequest request) {
         if(bankAccountRepository.existsByAccountNumber(request.getAccountNumber())) {
@@ -32,13 +36,20 @@ public class BankAccountService {
         bankAccount.setCustomer(customer);
         return mapToResponse(bankAccountRepository.save(bankAccount));
     }
+    // Staff get every account, a customer only their own
     public List<AccountResponse> getAllBankAccounts() {
-        return bankAccountRepository.findAll().stream()
+        Long scope = currentUser.customerScope();
+        List<BankAccount> accounts = scope == null
+                ? bankAccountRepository.findAll()
+                : bankAccountRepository.findByCustomerId(scope);
+        return accounts.stream()
                 .map(this::mapToResponse)
                 .toList();
     }
     public AccountResponse getBankAccountById(Long id) {
-        BankAccount account = bankAccountRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Bank account not found with id: " + id));
+        BankAccount account = bankAccountRepository.findById(id)
+                .filter(a -> currentUser.canAccess(a.getCustomer()))
+                .orElseThrow(() -> new ResourceNotFoundException("Bank account not found with id: " + id));
         return mapToResponse(account);
     }
 

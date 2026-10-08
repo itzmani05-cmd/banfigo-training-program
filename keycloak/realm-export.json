@@ -3,7 +3,7 @@
   "displayName": "Banfigo",
   "enabled": true,
   "sslRequired": "external",
-  "registrationAllowed": false,
+  "registrationAllowed": true,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": false,
@@ -24,8 +24,26 @@
       {
         "name": "CHECKER",
         "description": "Delete beneficiaries, approve/reject/revoke consents"
+      },
+      {
+        "name": "CUSTOMER",
+        "description": "Self-registered bank customer: sees only their own accounts, transactions, beneficiaries and consents; can transfer from their own accounts"
+      },
+      { "name": "offline_access", "description": "${role_offline-access}" },
+      { "name": "uma_authorization", "description": "${role_uma_authorization}" },
+      {
+        "name": "default-roles-banfigonew",
+        "description": "Given to every new user, including everyone who signs up on the login page",
+        "composite": true,
+        "composites": {
+          "realm": ["offline_access", "uma_authorization", "CUSTOMER"]
+        }
       }
     ]
+  },
+  "defaultRole": {
+    "name": "default-roles-banfigonew",
+    "composite": true
   },
   "clients": [
     {
@@ -91,6 +109,18 @@
         { "type": "password", "value": "checker123", "temporary": false }
       ],
       "realmRoles": ["CHECKER"]
+    },
+    {
+      "username": "customer1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Kavya",
+      "lastName": "Customer",
+      "email": "customer1@banfigo.local",
+      "credentials": [
+        { "type": "password", "value": "customer123", "temporary": false }
+      ],
+      "realmRoles": ["CUSTOMER"]
     }
   ]
 }

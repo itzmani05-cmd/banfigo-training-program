@@ -3,6 +3,7 @@ package com.example.banfigo.transaction.service;
 import com.example.banfigo.account.entity.BankAccount;
 import com.example.banfigo.account.repository.BankAccountRepository;
 import com.example.banfigo.common.exception.ResourceNotFoundException;
+import com.example.banfigo.customer.service.CurrentUser;
 import com.example.banfigo.transaction.dto.TransactionRequest;
 import com.example.banfigo.transaction.dto.TransactionResponse;
 import com.example.banfigo.transaction.entity.Transaction;
@@ -26,13 +27,20 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final BankAccountRepository bankAccountRepository;
+    private final TransactionLimitPolicy limitPolicy;
+    private final CurrentUser currentUser;
 
     public TransactionService(
-            TransactionRepository transactionRepository,
-            BankAccountRepository bankAccountRepository) {
+        TransactionRepository transactionRepository,
+        BankAccountRepository bankAccountRepository,
+        TransactionLimitPolicy limitPolicy,
+        CurrentUser currentUser
+    ) {
 
         this.transactionRepository = transactionRepository;
         this.bankAccountRepository = bankAccountRepository;
+        this.limitPolicy = limitPolicy;
+        this.currentUser = currentUser;
     }
 
     @Transactional
@@ -40,37 +48,32 @@ public class TransactionService {
             Long accountId,
             TransactionRequest request) {
 
-        // Lock the account row so two withdrawals can't both pass the balance check
+        limitPolicy.check(request.getAmount());
+
         BankAccount account = bankAccountRepository.findByIdForUpdate(accountId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Bank account not found with id: " + accountId));
+            .orElseThrow(() ->new ResourceNotFoundException( "Bank account not found with id: " + accountId));
 
         BigDecimal amount = request.getAmount();
 
         if (request.getTransactionType() == TransactionType.DEPOSIT) {
-
             account.setBalance(
-                    account.getBalance().add(amount)
+                account.getBalance().add(amount)
             );
-
-        } else if (request.getTransactionType() == TransactionType.WITHDRAWAL) {
-
+        } 
+        else if (request.getTransactionType() == TransactionType.WITHDRAWAL) {
             if (account.getBalance().compareTo(amount) < 0) {
                 throw new IllegalArgumentException(
                         "Insufficient balance"
                 );
             }
-
             account.setBalance(
-                    account.getBalance().subtract(amount)
+                account.getBalance().subtract(amount)
             );
         }
 
         bankAccountRepository.save(account);
 
         Transaction transaction = new Transaction();
-
         transaction.setTransactionType(request.getTransactionType());
         transaction.setAmount(amount);
         transaction.setDescription(request.getDescription());
@@ -86,9 +89,13 @@ public class TransactionService {
             LocalDate from,
             LocalDate to,
             TransactionType type,
-            Pageable pageable) {
-
-        if (!bankAccountRepository.existsById(accountId)) {
+            Pageable pageable
+    ) {
+        // A customer asking for someone else's account gets the same 404 as for a missing one
+        boolean visible = bankAccountRepository.findById(accountId)
+                .filter(a -> currentUser.canAccess(a.getCustomer()))
+                .isPresent();
+        if (!visible) {
             throw new ResourceNotFoundException(
                     "Bank account not found with id: " + accountId
             );
@@ -106,17 +113,16 @@ public class TransactionService {
 
             if (from != null) {
                 predicates.add(cb.greaterThanOrEqualTo(
-                        root.get("transactionDate"), from.atStartOfDay()));
+                    root.get("transactionDate"), from.atStartOfDay()));
             }
             if (to != null) {
                 // "to" is inclusive: include the whole day
                 predicates.add(cb.lessThan(
-                        root.get("transactionDate"), to.plusDays(1).atStartOfDay()));
+                    root.get("transactionDate"), to.plusDays(1).atStartOfDay()));
             }
             if (type != null) {
                 predicates.add(cb.equal(root.get("transactionType"), type));
             }
-
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 

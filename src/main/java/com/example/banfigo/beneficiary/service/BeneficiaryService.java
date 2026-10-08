@@ -7,6 +7,7 @@ import com.example.banfigo.beneficiary.repository.BeneficiaryRepository;
 import com.example.banfigo.common.exception.ResourceNotFoundException;
 import com.example.banfigo.customer.entity.Customer;
 import com.example.banfigo.customer.repository.CustomerRepository;
+import com.example.banfigo.customer.service.CurrentUser;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,17 +16,20 @@ import java.util.List;
 public class BeneficiaryService {
     private final BeneficiaryRepository beneficiaryRepository;
     private final CustomerRepository customerRepository;
+    private final CurrentUser currentUser;
 
     public BeneficiaryService(
             BeneficiaryRepository beneficiaryRepository,
-            CustomerRepository customerRepository) {
-
+            CustomerRepository customerRepository,
+            CurrentUser currentUser
+    ) {
         this.beneficiaryRepository = beneficiaryRepository;
         this.customerRepository = customerRepository;
+        this.currentUser = currentUser;
     }
 
     public BeneficiaryResponse createBeneficiary(BeneficiaryRequest request) {
-        Customer customer = customerRepository.findById(request.getCustomerId()).orElseThrow(() ->new ResourceNotFoundException("Customer not found with id: "+ request.getCustomerId()));
+        Customer customer = owner(request.getCustomerId());
 
         Beneficiary beneficiary = new Beneficiary();
         beneficiary.setName(request.getName());
@@ -38,14 +42,32 @@ public class BeneficiaryService {
     }
 
     public List<BeneficiaryResponse> getAllBeneficiaries() {
-        return beneficiaryRepository.findAll().stream()
-                .map(this::mapToResponse)
-                .toList();
+        Long scope = currentUser.customerScope();
+        List<Beneficiary> beneficiaries = scope == null
+                ? beneficiaryRepository.findAll()
+                : beneficiaryRepository.findByCustomerId(scope);
+        return beneficiaries.stream()
+            .map(this::mapToResponse)
+            .toList();
     }
 
     public void deleteBeneficiary(Long id) {
-        Beneficiary beneficiary = beneficiaryRepository.findById(id).orElseThrow(() ->new ResourceNotFoundException("Beneficiary not found with id: " + id));
+        Beneficiary beneficiary = beneficiaryRepository.findById(id)
+                .filter(b -> currentUser.canAccess(b.getCustomer()))
+                .orElseThrow(() ->new ResourceNotFoundException("Beneficiary not found with id: " + id));
         beneficiaryRepository.delete(beneficiary);
+    }
+
+    // Staff name the customer; a customer always adds to their own list
+    private Customer owner(Long customerId) {
+        if (currentUser.customerScope() != null) {
+            return currentUser.customer();
+        }
+        if (customerId == null) {
+            throw new IllegalArgumentException("Customer ID is required");
+        }
+        return customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + customerId));
     }
 
     private BeneficiaryResponse mapToResponse(Beneficiary beneficiary) {
@@ -55,7 +77,6 @@ public class BeneficiaryService {
                 beneficiary.getAccountNumber(),
                 beneficiary.getBankName(),
                 beneficiary.getIfscCode(),
-                // Reading the id of a lazy proxy doesn't trigger a database load
                 beneficiary.getCustomer().getId()
         );
     }

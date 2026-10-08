@@ -6,9 +6,11 @@ import com.example.banfigo.beneficiary.entity.Beneficiary;
 import com.example.banfigo.beneficiary.repository.BeneficiaryRepository;
 import com.example.banfigo.common.exception.ResourceNotFoundException;
 import com.example.banfigo.customer.entity.Customer;
+import com.example.banfigo.customer.service.CurrentUser;
 import com.example.banfigo.transaction.entity.Transaction;
 import com.example.banfigo.transaction.entity.TransactionType;
 import com.example.banfigo.transaction.repository.TransactionRepository;
+import com.example.banfigo.transaction.service.TransactionLimitPolicy;
 import com.example.banfigo.transfer.dto.TransferRequest;
 import com.example.banfigo.transfer.dto.TransferResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +31,7 @@ class TransferServiceTest {
     private BankAccountRepository accountRepository;
     private TransactionRepository transactionRepository;
     private BeneficiaryRepository beneficiaryRepository;
+    private CurrentUser currentUser;
     private TransferService transferService;
 
     private Customer alice;
@@ -41,7 +44,11 @@ class TransferServiceTest {
         accountRepository = mock(BankAccountRepository.class);
         transactionRepository = mock(TransactionRepository.class);
         beneficiaryRepository = mock(BeneficiaryRepository.class);
-        transferService = new TransferService(accountRepository, transactionRepository, beneficiaryRepository);
+        // Staff by default: every record is visible
+        currentUser = mock(CurrentUser.class);
+        when(currentUser.canAccess(any())).thenReturn(true);
+        transferService = new TransferService(accountRepository, transactionRepository, beneficiaryRepository,
+                new TransactionLimitPolicy(new BigDecimal("1000")), currentUser);
 
         alice = new Customer(10L, "Alice", "alice@example.com", null, null);
         bob = new Customer(20L, "Bob", "bob@example.com", null, null);
@@ -119,6 +126,72 @@ class TransferServiceTest {
         assertEquals("Insufficient balance", ex.getMessage());
         assertEquals(new BigDecimal("500.00"), accountA.getBalance());
         assertEquals(new BigDecimal("100.00"), accountB.getBalance());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsAmountOverTheLimitWithoutChangingAnything() {
+        accountA.setBalance(new BigDecimal("5000.00"));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> transferService.transfer(request(1L, 2L, "1000.01", null)));
+
+        assertEquals("Amount exceeds the per-transaction limit of 1000", ex.getMessage());
+        assertEquals(new BigDecimal("5000.00"), accountA.getBalance());
+        assertEquals(new BigDecimal("100.00"), accountB.getBalance());
+        verify(accountRepository, never()).findByIdForUpdate(any());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    // Logged in as Alice, a self-registered customer: only her own records are visible
+    private void loginAsAlice() {
+        when(currentUser.canAccess(any())).thenAnswer(inv -> alice.equals(inv.getArgument(0)));
+    }
+
+    @Test
+    void customerCannotPayFromSomeoneElsesAccount() {
+        loginAsAlice();
+
+        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class,
+                () -> transferService.transfer(request(2L, 1L, "10", null)));
+
+        assertEquals("Bank account not found with id: 2", ex.getMessage());
+        assertEquals(new BigDecimal("100.00"), accountB.getBalance());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void customerCannotTransferStraightIntoSomeoneElsesAccount() {
+        loginAsAlice();
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> transferService.transfer(request(1L, 2L, "10", null)));
+
+        assertEquals(new BigDecimal("500.00"), accountA.getBalance());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void customerCanPaySomeoneElseThroughTheirOwnBeneficiary() {
+        loginAsAlice();
+        beneficiary(7L, accountB.getAccountNumber(), alice);
+        when(accountRepository.findIdByAccountNumber(accountB.getAccountNumber())).thenReturn(Optional.of(2L));
+
+        transferService.transfer(beneficiaryRequest(1L, 7L, "50.00"));
+
+        assertEquals(new BigDecimal("450.00"), accountA.getBalance());
+        assertEquals(new BigDecimal("150.00"), accountB.getBalance());
+    }
+
+    @Test
+    void customerCannotUseAnotherCustomersBeneficiary() {
+        loginAsAlice();
+        beneficiary(8L, "9999999999", bob);
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> transferService.transfer(beneficiaryRequest(1L, 8L, "10")));
+
+        assertEquals(new BigDecimal("500.00"), accountA.getBalance());
         verify(transactionRepository, never()).save(any());
     }
 

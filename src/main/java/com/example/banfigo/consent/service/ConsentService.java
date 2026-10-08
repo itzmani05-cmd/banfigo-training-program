@@ -10,6 +10,7 @@ import com.example.banfigo.consent.entity.ConsentStatus;
 import com.example.banfigo.consent.repository.ConsentRepository;
 import com.example.banfigo.customer.entity.Customer;
 import com.example.banfigo.customer.repository.CustomerRepository;
+import com.example.banfigo.customer.service.CurrentUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,13 +31,16 @@ public class ConsentService {
     private final ConsentRepository consentRepository;
     private final CustomerRepository customerRepository;
     private final BankAccountRepository accountRepository;
+    private final CurrentUser currentUser;
 
     public ConsentService(ConsentRepository consentRepository,
                           CustomerRepository customerRepository,
-                          BankAccountRepository accountRepository) {
+                          BankAccountRepository accountRepository,
+                          CurrentUser currentUser) {
         this.consentRepository = consentRepository;
         this.customerRepository = customerRepository;
         this.accountRepository = accountRepository;
+        this.currentUser = currentUser;
     }
 
     @Transactional
@@ -70,20 +74,32 @@ public class ConsentService {
         return mapToResponse(consentRepository.save(consent));
     }
 
-    // status is optional; null returns every consent, newest first
+    // status is optional; null returns every consent, newest first. A customer only gets their own.
     @Transactional
     public List<ConsentResponse> getConsents(ConsentStatus status) {
         expireOverdue();
-        List<Consent> consents = status == null
-                ? consentRepository.findAllByOrderByCreatedAtDesc()
-                : consentRepository.findByStatusOrderByCreatedAtDesc(status);
+        Long scope = currentUser.customerScope();
+        List<Consent> consents;
+        if (scope == null) {
+            consents = status == null
+                    ? consentRepository.findAllByOrderByCreatedAtDesc()
+                    : consentRepository.findByStatusOrderByCreatedAtDesc(status);
+        } else {
+            consents = status == null
+                    ? consentRepository.findByCustomerIdOrderByCreatedAtDesc(scope)
+                    : consentRepository.findByCustomerIdAndStatusOrderByCreatedAtDesc(scope, status);
+        }
         return consents.stream().map(this::mapToResponse).toList();
     }
 
     @Transactional
     public ConsentResponse getConsent(Long id) {
         expireOverdue();
-        return mapToResponse(findConsent(id));
+        Consent consent = findConsent(id);
+        if (!currentUser.canAccess(consent.getCustomer())) {
+            throw new ResourceNotFoundException("Consent not found with id: " + id);
+        }
+        return mapToResponse(consent);
     }
 
     @Transactional

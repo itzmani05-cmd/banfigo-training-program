@@ -1,7 +1,6 @@
 package com.example.banfigo.beneficiary.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
 public class BeneficiaryRequest {
@@ -26,7 +25,7 @@ public class BeneficiaryRequest {
     )
     private String ifscCode;
 
-    @NotNull(message = "Customer ID is required")
+    // Required for staff; ignored for a customer, whose beneficiaries are always their own
     private Long customerId;
 
     public BeneficiaryRequest() {

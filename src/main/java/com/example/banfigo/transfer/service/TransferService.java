@@ -5,9 +5,11 @@ import com.example.banfigo.account.repository.BankAccountRepository;
 import com.example.banfigo.beneficiary.entity.Beneficiary;
 import com.example.banfigo.beneficiary.repository.BeneficiaryRepository;
 import com.example.banfigo.common.exception.ResourceNotFoundException;
+import com.example.banfigo.customer.service.CurrentUser;
 import com.example.banfigo.transaction.entity.Transaction;
 import com.example.banfigo.transaction.entity.TransactionType;
 import com.example.banfigo.transaction.repository.TransactionRepository;
+import com.example.banfigo.transaction.service.TransactionLimitPolicy;
 import com.example.banfigo.transfer.dto.TransferRequest;
 import com.example.banfigo.transfer.dto.TransferResponse;
 import org.springframework.stereotype.Service;
@@ -27,15 +29,21 @@ public class TransferService {
     private final BankAccountRepository bankAccountRepository;
     private final TransactionRepository transactionRepository;
     private final BeneficiaryRepository beneficiaryRepository;
+    private final TransactionLimitPolicy limitPolicy;
+    private final CurrentUser currentUser;
 
     public TransferService(
             BankAccountRepository bankAccountRepository,
             TransactionRepository transactionRepository,
-            BeneficiaryRepository beneficiaryRepository) {
+            BeneficiaryRepository beneficiaryRepository,
+            TransactionLimitPolicy limitPolicy,
+            CurrentUser currentUser) {
 
         this.bankAccountRepository = bankAccountRepository;
         this.transactionRepository = transactionRepository;
         this.beneficiaryRepository = beneficiaryRepository;
+        this.limitPolicy = limitPolicy;
+        this.currentUser = currentUser;
     }
 
     // Debit and credit happen in one database transaction: if anything fails,
@@ -52,6 +60,8 @@ public class TransferService {
             );
         }
 
+        limitPolicy.check(request.getAmount());
+
         return toAccount
                 ? transferBetweenAccounts(request, request.getToAccountId(), null)
                 : transferToBeneficiary(request);
@@ -60,6 +70,7 @@ public class TransferService {
     private TransferResponse transferToBeneficiary(TransferRequest request) {
 
         Beneficiary beneficiary = beneficiaryRepository.findById(request.getBeneficiaryId())
+                .filter(b -> currentUser.canAccess(b.getCustomer()))
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Beneficiary not found with id: " + request.getBeneficiaryId()));
@@ -74,6 +85,7 @@ public class TransferService {
 
         // Beneficiary is at another bank: only the debit is recorded here
         BankAccount from = lockAccount(request.getFromAccountId());
+        requireAccess(from);
         checkOwnsBeneficiary(from, beneficiary);
         debit(from, request.getAmount());
 
@@ -112,6 +124,13 @@ public class TransferService {
         BankAccount from = fromId.equals(first.getId()) ? first : second;
         BankAccount to = fromId.equals(first.getId()) ? second : first;
 
+        // A customer pays from their own account. Paying someone else goes through a saved beneficiary;
+        // a plain account-to-account transfer is only between the customer's own accounts.
+        requireAccess(from);
+        if (beneficiary == null) {
+            requireAccess(to);
+        }
+
         if (beneficiary != null) {
             checkOwnsBeneficiary(from, beneficiary);
         }
@@ -145,6 +164,13 @@ public class TransferService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Bank account not found with id: " + id));
+    }
+
+    // Answers like a missing account, so customers can't probe for other people's account ids
+    private void requireAccess(BankAccount account) {
+        if (!currentUser.canAccess(account.getCustomer())) {
+            throw new ResourceNotFoundException("Bank account not found with id: " + account.getId());
+        }
     }
 
     private void debit(BankAccount account, BigDecimal amount) {

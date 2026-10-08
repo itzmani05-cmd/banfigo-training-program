@@ -4,6 +4,7 @@ import com.example.banfigo.account.dto.Statement;
 import com.example.banfigo.account.entity.BankAccount;
 import com.example.banfigo.account.repository.BankAccountRepository;
 import com.example.banfigo.common.exception.ResourceNotFoundException;
+import com.example.banfigo.customer.service.CurrentUser;
 import com.example.banfigo.transaction.entity.Transaction;
 import com.example.banfigo.transaction.entity.TransactionType;
 import com.example.banfigo.transaction.repository.TransactionRepository;
@@ -24,13 +25,16 @@ public class StatementService {
 
     private final BankAccountRepository bankAccountRepository;
     private final TransactionRepository transactionRepository;
+    private final CurrentUser currentUser;
 
     public StatementService(
             BankAccountRepository bankAccountRepository,
-            TransactionRepository transactionRepository) {
+            TransactionRepository transactionRepository,
+            CurrentUser currentUser) {
 
         this.bankAccountRepository = bankAccountRepository;
         this.transactionRepository = transactionRepository;
+        this.currentUser = currentUser;
     }
 
     @Transactional(readOnly = true)
@@ -48,6 +52,7 @@ public class StatementService {
         }
 
         BankAccount account = bankAccountRepository.findById(accountId)
+                .filter(a -> currentUser.canAccess(a.getCustomer()))
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "Bank account not found with id: " + accountId));

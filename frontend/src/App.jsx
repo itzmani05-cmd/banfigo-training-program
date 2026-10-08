@@ -8,19 +8,24 @@ import TransferSection from './components/TransferSection';
 import ConsentSection from './components/ConsentSection';
 import Icon from './components/icons';
 import { getUser, logout } from './auth';
+import { isCustomer } from './permissions';
 
 const TABS = [
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', component: Dashboard },
-  { key: 'customers', label: 'Customers', icon: 'customers', component: CustomerSection },
+  { key: 'customers', label: 'Customers', icon: 'customers', component: CustomerSection, staffOnly: true },
   { key: 'accounts', label: 'Accounts', icon: 'accounts', component: AccountSection },
-  { key: 'transactions', label: 'Transactions', icon: 'transactions', component: TransactionSection },
+  // Customers see their history under Accounts > View
+  { key: 'transactions', label: 'Transactions', icon: 'transactions', component: TransactionSection, staffOnly: true },
   { key: 'transfers', label: 'Transfers', icon: 'transfers', component: TransferSection },
   { key: 'beneficiaries', label: 'Beneficiaries', icon: 'beneficiaries', component: BeneficiarySection },
   { key: 'consents', label: 'Consents', icon: 'consents', component: ConsentSection },
 ];
 
 // Only the app's own roles, not Keycloak defaults like offline_access
-const APP_ROLES = ['ADMIN', 'MAKER', 'CHECKER'];
+const APP_ROLES = ['ADMIN', 'MAKER', 'CHECKER', 'CUSTOMER'];
+
+// Tabs for the logged-in user: a self-registered customer doesn't get the staff tools
+const visibleTabs = () => (isCustomer() ? TABS.filter((tab) => !tab.staffOnly) : TABS);
 
 // Logo sits on a white tile so its dark-blue parts stay visible on the black background
 function Brand({ large = false }) {
@@ -31,7 +36,7 @@ function Brand({ large = false }) {
       </span>
       <div className="leading-tight">
         <div className={`font-bold text-paper ${large ? 'text-title' : ''}`}>Banfigo</div>
-        <div className="text-caption text-paper/60">Banking Console</div>
+        <div className="text-caption text-paper/60">{isCustomer() ? 'Online Banking' : 'Banking Console'}</div>
       </div>
     </div>
   );
@@ -40,7 +45,7 @@ function Brand({ large = false }) {
 function NavItems({ active, onSelect }) {
   return (
     <ul className="space-y-1">
-      {TABS.map((tab) => {
+      {visibleTabs().map((tab) => {
         const selected = active === tab.key;
         return (
           <li key={tab.key}>

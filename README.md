@@ -139,15 +139,32 @@ Then open:
 
 ### Logins
 
-The `BanfigoNew` realm is imported automatically from `keycloak/realm-export.json` on first start (client `BanfigoFrontend`, roles `ADMIN`, `MAKER`, `CHECKER`):
+The `BanfigoNew` realm is imported automatically from `keycloak/realm-export.json` on first start (client `BanfigoFrontend`, roles `ADMIN`, `MAKER`, `CHECKER`, `CUSTOMER`):
 
 | Username | Password | Role |
 |---|---|---|
 | `admin1` | `admin123` | ADMIN |
 | `maker1` | `maker123` | MAKER |
 | `checker1` | `checker123` | CHECKER |
+| `customer1` | `customer123` | CUSTOMER |
 
 These are demo credentials for local use only.
+
+### Customer sign-up
+
+Anyone can create their own login with the **Register** link on the Keycloak login page. New users get the `CUSTOMER` role automatically (it's in the realm's default roles).
+
+- **First login:** the backend creates a `Customer` record for them, using the name and email from the token and linking it by the Keycloak user id (`customers.keycloak_user_id`). Phone and address start empty, and staff can fill them in later.
+- **What they see:** customers only see their own accounts, transactions, statements, beneficiaries and consents, plus a dashboard of their own figures. Someone else's record answers `404`, the same as a missing one. `GET /api/me` returns their own customer record.
+- **What they can do:** add and delete their own beneficiaries, and make transfers from their own accounts, either between their own accounts or to one of their saved beneficiaries. Deposits, withdrawals, opening accounts and consent decisions stay with staff.
+- **Opening an account:** an ADMIN opens it for the customer as usual, using the customer ID shown in the Customers tab.
+- **Staff roles win:** a user who has a staff role (`ADMIN`, `MAKER`, `CHECKER`) is treated as staff even if they also have `CUSTOMER`.
+- **Email verification** is off, because the local stack has no mail server.
+
+Keycloak only imports the realm file the first time it starts. If your `keycloak_data` volume already exists, either recreate it (`docker compose down`, `docker volume rm banfigo_keycloak_data`, `docker compose up -d`) or make the same changes in the admin console:
+- Realm settings → Login → User registration: on.
+- Create the realm role `CUSTOMER`.
+- Realm settings → User registration → Default roles: add `CUSTOMER`.
 
 ### How login works behind the gateway
 
@@ -155,6 +172,18 @@ These are demo credentials for local use only.
 - The frontend image is built with `VITE_KEYCLOAK_URL=/auth` (same origin as the app, through Nginx) and `VITE_API_BASE_URL=/api`.
 - The backend checks the token's issuer against the public URL (`SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI`) but downloads Keycloak's signing keys over the Docker network (`..._JWK_SET_URI=http://keycloak:8080/auth/realms/BanfigoNew/protocol/openid-connect/certs`). The role rules in `SecurityConfig` are unchanged.
 - These are environment variables in `docker-compose.yml`; `application.properties` and `frontend/.env` still describe the local (non-Docker) setup, which keeps working as before.
+
+### Rate limiting
+
+Nginx limits requests per client IP (`limit_req` in `nginx/nginx.conf`):
+
+| Zone | Applies to | Limit |
+|---|---|---|
+| `api` | every `/api/` request | 20/s, burst 40 |
+| `api_write` | `POST`/`PUT`/`PATCH`/`DELETE` on `/api/` | 5/s, burst 10 |
+| `login` | `POST` to Keycloak's login form and token endpoint | 10/min, burst 10 |
+
+Over the limit, the gateway answers `429 Too Many Requests` with a `Retry-After` header and the same JSON error body the API uses, so the frontend shows the message like any other error. Rejections are logged as warnings in `docker compose logs nginx`. Keycloak's own brute-force lockout (`bruteForceProtected` in the realm) still applies on top. The local (non-Docker) setup has no gateway, so no limits apply there.
 
 ### Data
 

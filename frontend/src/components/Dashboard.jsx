@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { DashboardApi } from '../api';
 import MonthlyFlowChart from './MonthlyFlowChart';
 import { money } from '../format';
+import { isCustomer } from '../permissions';
 import { Alert, Button, Card, Empty, PageHeader, StatTile, Table, Td, TransactionTypeBadge } from './ui';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const customer = isCustomer();
 
   const load = async () => {
     setError('');
@@ -23,7 +25,10 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title="Dashboard" description="Overview of balances and recent activity across the bank.">
+      <PageHeader
+        title="Dashboard"
+        description={customer ? 'Your balances and recent activity.' : 'Overview of balances and recent activity across the bank.'}
+      >
         <Button icon="refresh" onClick={load}>Refresh</Button>
       </PageHeader>
 
@@ -33,17 +38,23 @@ export default function Dashboard() {
         !error && <Empty>Loading...</Empty>
       ) : (
         <>
-          <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <StatTile label="Total balance" value={money(data.totalBalance)} icon="wallet" highlight className="sm:col-span-2 xl:col-span-1" />
+          <div className={`mb-6 grid gap-4 sm:grid-cols-2 ${customer ? '' : 'xl:grid-cols-3'}`}>
+            <StatTile
+              label="Total balance"
+              value={money(data.totalBalance)}
+              icon="wallet"
+              highlight
+              className={customer ? '' : 'sm:col-span-2 xl:col-span-1'}
+            />
             <StatTile label="Accounts" value={data.accountCount} icon="accounts" />
-            <StatTile label="Customers" value={data.customerCount} icon="customers" />
+            {!customer && <StatTile label="Customers" value={data.customerCount} icon="customers" />}
           </div>
 
           <Card title="Money in vs money out" subtitle={`Last ${data.monthlyFlows.length} months`}>
             <MonthlyFlowChart flows={data.monthlyFlows} />
           </Card>
 
-          <Card title="Recent transactions" subtitle="The 10 latest across all accounts">
+          <Card title="Recent transactions" subtitle={`The 10 latest across ${customer ? 'your' : 'all'} accounts`}>
             {data.recentTransactions.length === 0 ? (
               <Empty>No transactions yet.</Empty>
             ) : (
